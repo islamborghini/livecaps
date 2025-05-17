@@ -15,14 +15,15 @@ import {
 import Visualizer from "./Visualizer";
 
 const App: () => JSX.Element = () => {
-  const [caption, setCaption] = useState<string | undefined>(
-    "Powered by Deepgram"
-  );
+  const [transcription, setTranscription] = useState<string>("");
+  const [interimTranscript, setInterimTranscript] = useState<string>("");
   const { connection, connectToDeepgram, connectionState } = useDeepgram();
   const { setupMicrophone, microphone, startMicrophone, microphoneState } =
     useMicrophone();
-  const captionTimeout = useRef<any>();
   const keepAliveInterval = useRef<any>();
+  const transcriptionContainerRef = useRef<HTMLDivElement>(null);
+  const transcriptHistory = useRef<Set<string>>(new Set());
+  const lastFinalText = useRef<string>("");
 
   useEffect(() => {
     setupMicrophone();
@@ -55,21 +56,37 @@ const App: () => JSX.Element = () => {
     };
 
     const onTranscript = (data: LiveTranscriptionEvent) => {
-      const { is_final: isFinal, speech_final: speechFinal } = data;
-      let thisCaption = data.channel.alternatives[0].transcript;
+      const { is_final: isFinal } = data;
+      let thisCaption = data.channel.alternatives[0].transcript.trim();
 
-      console.log("thisCaption", thisCaption);
-      if (thisCaption !== "") {
-        console.log('thisCaption !== ""', thisCaption);
-        setCaption(thisCaption);
-      }
-
-      if (isFinal && speechFinal) {
-        clearTimeout(captionTimeout.current);
-        captionTimeout.current = setTimeout(() => {
-          setCaption(undefined);
-          clearTimeout(captionTimeout.current);
-        }, 3000);
+      if (thisCaption === "") return;
+      
+      if (isFinal) {
+        // Prevent adding the same final text multiple times
+        if (transcriptHistory.current.has(thisCaption)) {
+          return;
+        }
+        
+        // Store this text in history to avoid duplicates
+        transcriptHistory.current.add(thisCaption);
+        lastFinalText.current = thisCaption;
+        
+        // Append to main transcript
+        setTranscription(prev => {
+          const newText = prev + (prev ? " " : "") + thisCaption;
+          return newText;
+        });
+        
+        // Clear interim transcript
+        setInterimTranscript("");
+      } else {
+        // For interim results, completely replace the interim transcript
+        // Don't show interim results that are identical to the last final text
+        if (thisCaption !== lastFinalText.current) {
+          setInterimTranscript(thisCaption);
+        } else {
+          setInterimTranscript("");
+        }
       }
     };
 
@@ -84,10 +101,16 @@ const App: () => JSX.Element = () => {
       // prettier-ignore
       connection.removeListener(LiveTranscriptionEvents.Transcript, onTranscript);
       microphone.removeEventListener(MicrophoneEvents.DataAvailable, onData);
-      clearTimeout(captionTimeout.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionState]);
+
+  // Scroll to bottom when transcription updates
+  useEffect(() => {
+    if (transcriptionContainerRef.current) {
+      transcriptionContainerRef.current.scrollTop = transcriptionContainerRef.current.scrollHeight;
+    }
+  }, [transcription, interimTranscript]);
 
   useEffect(() => {
     if (!connection) return;
@@ -111,22 +134,38 @@ const App: () => JSX.Element = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microphoneState, connectionState]);
 
+  // Combined transcription for display
+  const displayTranscription = transcription + (interimTranscript ? " " + interimTranscript : "");
+
   return (
-    <>
-      <div className="flex h-full antialiased">
-        <div className="flex flex-row h-full w-full overflow-x-hidden">
-          <div className="flex flex-col flex-auto h-full">
-            {/* height 100% minus 8rem */}
-            <div className="relative w-full h-full">
-              {microphone && <Visualizer microphone={microphone} />}
-              <div className="absolute bottom-[8rem]  inset-x-0 max-w-4xl mx-auto text-center">
-                {caption && <span className="bg-black/70 p-8">{caption}</span>}
-              </div>
+    <div className="flex h-full w-full flex-col md:flex-row">
+      {/* Left half - Transcription */}
+      <div className="w-full md:w-1/2 h-full flex flex-col border-b md:border-b-0 md:border-r border-gray-700/30">
+        <div 
+          ref={transcriptionContainerRef}
+          className="flex-1 p-4 md:p-8 overflow-y-auto text-left text-xl md:text-2xl lg:text-3xl font-light transcription-panel"
+        >
+          {displayTranscription ? (
+            <div className="whitespace-pre-wrap break-words">
+              {transcription}
+              {interimTranscript && (
+                <span className="text-gray-400"> {interimTranscript}</span>
+              )}
             </div>
-          </div>
+          ) : (
+            <span className="text-gray-500">Speak to see transcription here...</span>
+          )}
+        </div>
+        <div className="h-16 md:h-24 p-2 md:p-4 flex items-center justify-center">
+          {microphone && <Visualizer microphone={microphone} height={80} />}
         </div>
       </div>
-    </>
+      
+      {/* Right half - Empty */}
+      <div className="hidden md:block md:w-1/2 h-full">
+        {/* Intentionally left empty */}
+      </div>
+    </div>
   );
 };
 
