@@ -14,9 +14,10 @@ import {
 } from "../context/MicrophoneContextProvider";
 import Visualizer from "./Visualizer";
 import LanguageSelector, { Language, languages } from "./LanguageSelector";
-import { translateBySentences } from "../services/translationService";
+import { detectSentences, processSentencesForTranslation, translateBySentences } from "../services/translationService";
 
 const App: () => JSX.Element = () => {
+  // Enhanced state management for transcription
   const [transcription, setTranscription] = useState<string>("");
   const [translatedText, setTranslatedText] = useState<string>("");
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
@@ -28,12 +29,17 @@ const App: () => JSX.Element = () => {
   const keepAliveInterval = useRef<any>();
   const transcriptionContainerRef = useRef<HTMLDivElement>(null);
   const translationContainerRef = useRef<HTMLDivElement>(null);
-  const transcriptHistory = useRef<Set<string>>(new Set());
-  const lastFinalText = useRef<string>("");
-  const pauseDetected = useRef<boolean>(false);
-  const lastUtteranceTime = useRef<number>(Date.now());
   const translationTimeout = useRef<NodeJS.Timeout | null>(null);
-
+  
+  // Enhanced refs for sentence management
+  const transcriptHistory = useRef<Set<string>>(new Set());
+  const completeSentences = useRef<string[]>([]); // For storing complete sentences
+  const currentSentenceRef = useRef<string>(""); // For tracking current incomplete sentence
+  const lastUtteranceTime = useRef<number>(Date.now()); // Add missing ref
+  const lastFinalText = useRef<string>("");
+  const lastInterimWasNewSentence = useRef<boolean>(false);
+  const sentenceBoundaryDetected = useRef<boolean>(false);
+  
   useEffect(() => {
     setupMicrophone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,7 +58,7 @@ const App: () => JSX.Element = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microphoneState]);
 
-  // Handle translation of the transcription
+  // Handle translation of the transcription with improved sentence formatting
   useEffect(() => {
     // Only translate when we have text and a language selected
     if (!transcription.trim()) {
@@ -65,11 +71,11 @@ const App: () => JSX.Element = () => {
       clearTimeout(translationTimeout.current);
     }
 
-    // Slight delay to avoid translating every single keystroke
-    // Using a longer delay (1000ms) to ensure we don't translate too frequently
+    // Translate with a slight delay to avoid excessive API calls
     setIsTranslating(true);
     translationTimeout.current = setTimeout(async () => {
       try {
+        // Use the enhanced translation service that preserves paragraph structure
         const result = await translateBySentences({
           text: transcription,
           sourceLanguage: "auto",
@@ -82,7 +88,7 @@ const App: () => JSX.Element = () => {
       } finally {
         setIsTranslating(false);
       }
-    }, 1000); // Increased to 1 second
+    }, 600); // Reduced for better responsiveness
 
     return () => {
       if (translationTimeout.current) {
@@ -90,6 +96,25 @@ const App: () => JSX.Element = () => {
       }
     };
   }, [transcription, selectedLanguage]);
+  
+  // Helper functions for sentence detection
+  const isSentenceEnd = (text: string): boolean => {
+    if (!text) return false;
+    // Check if text ends with sentence-ending punctuation
+    return /[.!?…][ "\n]*$/.test(text);
+  };
+  
+  const startsNewSentence = (text: string): boolean => {
+    if (!text) return false;
+    // Check if text starts with a capital letter after trimming spaces
+    const trimmed = text.trim();
+    return trimmed.length > 0 && /^[A-Z]/.test(trimmed);
+  };
+  
+  const hasSignificantPause = (timeSinceLastUtterance: number): boolean => {
+    // Consider a pause over 1 second as significant for sentence boundary
+    return timeSinceLastUtterance > 1000;
+  };
 
   useEffect(() => {
     if (!microphone) return;
@@ -111,37 +136,79 @@ const App: () => JSX.Element = () => {
       
       const currentTime = Date.now();
       const timeSinceLastUtterance = currentTime - lastUtteranceTime.current;
-      
-      // Update the last utterance time
       lastUtteranceTime.current = currentTime;
       
+      // Detect if there's been a significant pause that might indicate sentence boundary
+      const pauseDetected = hasSignificantPause(timeSinceLastUtterance);
+      
+      // Enhanced handling that preserves sentence boundaries
       if (isFinal) {
-        // Prevent adding the same final text multiple times
+        // Prevent duplicate processing
         if (transcriptHistory.current.has(thisCaption)) {
           return;
         }
         
-        // Store this text in history to avoid duplicates
+        // Store in history to avoid duplicates
         transcriptHistory.current.add(thisCaption);
         lastFinalText.current = thisCaption;
         
-        // Always add each new sentence as a separate paragraph
-        setTranscription(prev => {
-          // Add a line break for each new sentence
-          const newText = prev + (prev ? "\n\n" : "") + thisCaption;
-          return newText;
-        });
-        
-        // Clear interim transcript
-        setInterimTranscript("");
-      } else {
-        // For interim results, completely replace the interim transcript
-        // Don't show interim results that are identical to the last final text
-        if (thisCaption !== lastFinalText.current) {
-          setInterimTranscript(thisCaption);
+        // Process the final text as complete sentences
+        const extractedSentences = detectSentences(thisCaption);
+        if (extractedSentences.length > 0) {
+          // Update the complete sentences with newly detected ones
+          const formattedSentences = extractedSentences.map(s => s.trim());
+          
+          // Update transcription with proper paragraph breaks between sentences
+          setTranscription(prev => {
+            if (!prev) return formattedSentences.join('\n\n');
+            
+            return prev + '\n\n' + formattedSentences.join('\n\n');
+          });
+          
+          // Store the complete sentences for reference
+          completeSentences.current = [
+            ...completeSentences.current,
+            ...formattedSentences
+          ];
+          
+          // Clear the current sentence being built
+          currentSentenceRef.current = "";
         } else {
-          setInterimTranscript("");
+          // If no complete sentences detected but text is available, 
+          // add it as a paragraph
+          setTranscription(prev => {
+            if (!prev) return thisCaption;
+            return prev + '\n\n' + thisCaption;
+          });
+          
+          currentSentenceRef.current = "";
         }
+        
+        // Clear interim transcript after processing final text
+        setInterimTranscript("");
+        lastInterimWasNewSentence.current = false;
+        sentenceBoundaryDetected.current = false;
+        
+      } else {
+        // Handle interim results with improved sentence boundary detection
+        
+        // Skip if identical to last final text
+        if (thisCaption === lastFinalText.current) {
+          setInterimTranscript("");
+          return;
+        }
+        
+        // Check if this interim text starts a new sentence
+        const isNewSentence = startsNewSentence(thisCaption) || 
+                             (pauseDetected && thisCaption.trim().length > 0) ||
+                             sentenceBoundaryDetected.current;
+        
+        // Update the sentence boundary detection status
+        sentenceBoundaryDetected.current = isSentenceEnd(thisCaption);
+        
+        // Display interim text in a way that respects sentence boundaries
+        setInterimTranscript(thisCaption);
+        lastInterimWasNewSentence.current = isNewSentence;
       }
     };
 
@@ -159,6 +226,21 @@ const App: () => JSX.Element = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionState]);
+
+  // Generate the combined display transcription with improved formatting
+  const displayTranscription = () => {
+    if (!transcription && !interimTranscript) return "";
+    
+    // If we have interim text that represents a new sentence,
+    // display it with a paragraph break
+    if (interimTranscript && lastInterimWasNewSentence.current) {
+      return transcription + (transcription ? '\n\n' : '') + interimTranscript;
+    }
+    
+    // Otherwise, display interim text in the same paragraph as it's continuing
+    // the current sentence
+    return transcription + (interimTranscript ? ' ' + interimTranscript : '');
+  };
 
   // Scroll to bottom when transcription updates
   useEffect(() => {
@@ -198,9 +280,6 @@ const App: () => JSX.Element = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microphoneState, connectionState]);
-
-  // Combined transcription for display
-  const displayTranscription = transcription + (interimTranscript ? "\n\n" + interimTranscript : "");
 
   // Set up mutation observer for better scroll handling
   useEffect(() => {
@@ -256,12 +335,9 @@ const App: () => JSX.Element = () => {
             ref={transcriptionContainerRef}
             className="flex-1 p-4 md:p-8 overflow-y-auto text-left text-xl md:text-2xl lg:text-3xl font-light transcription-panel"
           >
-            {displayTranscription ? (
+            {displayTranscription() ? (
               <div className="whitespace-pre-wrap break-words">
-                {transcription}
-                {interimTranscript && (
-                  <span className="text-gray-400"> {interimTranscript}</span>
-                )}
+                {displayTranscription()}
               </div>
             ) : (
               <span className="text-gray-500">Speak to see transcription here...</span>
