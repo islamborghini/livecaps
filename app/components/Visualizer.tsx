@@ -14,7 +14,12 @@ const interpolateColor = (
   return result;
 };
 
-const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
+interface VisualizerProps {
+  microphone: MediaRecorder;
+  height?: number;
+}
+
+const Visualizer: React.FC<VisualizerProps> = ({ microphone, height }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const analyser = audioContext.createAnalyser();
@@ -34,13 +39,13 @@ const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
     if (!canvas) return;
 
     canvas.style.width = "100%";
-    canvas.style.height = "100%";
+    canvas.style.height = height ? `${height}px` : "100%";
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
 
     const context = canvas.getContext("2d");
     const width = canvas.width;
-    const height = canvas.height;
+    const canvasHeight = canvas.height;
 
     requestAnimationFrame(draw);
 
@@ -48,7 +53,7 @@ const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
 
     if (!context) return;
 
-    context.clearRect(0, 0, width, height);
+    context.clearRect(0, 0, width, canvasHeight);
 
     const barWidth = 10;
     let x = 0;
@@ -56,19 +61,19 @@ const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
     const endColor = [20, 154, 251];
 
     for (const value of dataArray) {
-      const barHeight = (value / 255) * height * 2;
+      const barHeight = (value / 255) * canvasHeight * 2;
 
       const interpolationFactor = value / 255;
 
       const color = interpolateColor(startColor, endColor, interpolationFactor);
 
       context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.1)`;
-      context.fillRect(x, height - barHeight, barWidth, barHeight);
+      context.fillRect(x, canvasHeight - barHeight, barWidth, barHeight);
       x += barWidth;
     }
   };
 
-  return <canvas ref={canvasRef} width={window.innerWidth}></canvas>;
+  return <canvas ref={canvasRef} style={{ width: '100%', height: height ? `${height}px` : '100%' }}></canvas>;
 };
 
 export default Visualizer;
