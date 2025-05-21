@@ -1,0 +1,11 @@
+{
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "env": {
+    "VERCEL_BUILDING": {
+      "type": "system"
+    }
+  }
+}

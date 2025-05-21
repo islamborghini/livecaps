@@ -44,6 +44,12 @@ async function translateWithDeepL(text: string, targetLanguage: string) {
     throw new Error('DeepL API key not configured properly');
   }
   
+  // Skip DeepL API call during build time
+  if (process.env.VERCEL_ENV === "production" && process.env.VERCEL_BUILDING === "1") {
+    console.log("Skipping DeepL API call during build time");
+    throw new Error('Build-time: DeepL API call skipped');
+  }
+  
   try {
     // Convert language codes if necessary (DeepL uses different codes than Google for some languages)
     const deepLLanguage = convertToDeepLCode(targetLanguage);
@@ -134,6 +140,16 @@ function convertToDeepLCode(langCode: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Skip actual API processing during build time
+  if (process.env.VERCEL_ENV === "production" && process.env.VERCEL_BUILDING === "1") {
+    console.log("Skipping translation processing during build time");
+    return NextResponse.json({ 
+      translatedText: "Build-time placeholder for translation",
+      provider: "none",
+      message: "This is a build-time placeholder. Actual translation will happen at runtime."
+    });
+  }
+  
   try {
     const body = await request.json();
     const { text, targetLanguage } = body;
