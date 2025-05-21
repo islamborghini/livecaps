@@ -1,7 +1,5 @@
 # LiveCaps - Real-Time Speech Transcription and Translation
 
-![LiveCaps Logo](/public/dg.png)
-
 LiveCaps is a browser-based application that provides real-time speech transcription and translation, powered by [Deepgram](https://deepgram.com) for speech recognition and multiple translation services.
 
 ## Features
@@ -13,9 +11,6 @@ LiveCaps is a browser-based application that provides real-time speech transcrip
 - **Responsive design** that works on desktop and mobile devices
 - **No server required** - operates entirely in the browser
 
-## Demo
-
-Visit [Live Demo URL](https://your-demo-url.com) to try LiveCaps without installation.
 
 ## Technology Stack
 
