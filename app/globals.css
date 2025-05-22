@@ -7,13 +7,13 @@
  */
 :root {
   background: #0b0b0c;
-  font-size: 25px;
+  font-size: 22.5px; /* Changed from 25px to 90% scale (22.5px) */
   color-scheme: dark;
 }
 
 @media only screen and (min-width: 2000px) {
   :root {
-    font-size: 22px;
+    font-size: 19.8px; /* Changed from 22px to 90% scale (19.8px) */
   }
 }
 
