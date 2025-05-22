@@ -1,9 +1,9 @@
 # LiveCaps - Real-Time Speech Transcription and Translation
 
-![LiveCaps Logo](/public/dg.png)
 
 LiveCaps is a browser-based application that provides real-time speech transcription and translation, powered by [Deepgram](https://deepgram.com) for speech recognition and multiple translation services.
 
+![LiveCaps Screenshot](/public/screenshot.png)
 ## Features
 
 - **Real-time transcription** using Deepgram's Nova-3 model
@@ -16,7 +16,7 @@ LiveCaps is a browser-based application that provides real-time speech transcrip
 
 ## Demo
 
-Visit [LiveCaps](https://livecaps-qjbobm870-islamborghinis-projects.vercel.app) to try the application without installation.
+Visit [LiveCaps](https://livecaps.vercel.app/) to try the application without installation.
 
 ## Technology Stack
 
