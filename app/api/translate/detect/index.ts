@@ -1,0 +1,1 @@
+// This is an empty placeholder file to ensure the folder structure is maintained

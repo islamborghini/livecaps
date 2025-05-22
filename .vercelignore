@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+.next
+.husky
+.commitlintrc
+.eslintrc
+README.md
+CHANGELOG.md
+KNOWN_ISSUES.md
