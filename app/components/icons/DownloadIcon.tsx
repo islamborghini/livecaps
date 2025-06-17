@@ -1,3 +1,15 @@
+/**
+ * Download Icon Component
+ * 
+ * SVG icon component representing a download action.
+ * Used for file downloads, export functionality, or save operations.
+ * 
+ * Features:
+ * - Clear download arrow with tray design
+ * - Customizable styling via className
+ * - Universal download symbol recognition
+ */
+
 export const DownloadIcon = ({ className = "" }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

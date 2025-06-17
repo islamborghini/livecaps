@@ -1,3 +1,15 @@
+/**
+ * Home Page Component
+ * 
+ * Main landing page for the LiveCaps application. Renders the application header 
+ * with the LiveCaps branding and contains the main App component that handles 
+ * real-time speech transcription and translation functionality.
+ * 
+ * Features:
+ * - Application header with gradient background
+ * - Responsive layout with proper spacing
+ * - Main content area that houses the core App component
+ */
 "use client";
 
 import Image from "next/image";

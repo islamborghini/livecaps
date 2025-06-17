@@ -1,3 +1,14 @@
+/**
+ * Bolt Icon Component
+ * 
+ * SVG icon component displaying a lightning bolt symbol.
+ * Represents speed, power, energy, or quick actions in the UI.
+ * 
+ * Features:
+ * - Dynamic lightning bolt design
+ * - Symbolizes fast processing or real-time features
+ * - Customizable styling options
+ */
 export const BoltIcon = ({ className = "" }) => {
   return (
     <svg

@@ -1,3 +1,14 @@
+/**
+ * Send Icon Component
+ * 
+ * SVG icon component representing a send/submit action.
+ * Used in UI elements that require a send or submit visual indicator.
+ * 
+ * Features:
+ * - Clean, minimal send arrow design
+ * - Customizable styling via className prop
+ * - Scalable SVG format
+ */
 export const SendIcon = ({ className, ...rest }: { className?: string }) => {
   return (
     <svg

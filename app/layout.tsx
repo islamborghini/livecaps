@@ -1,3 +1,17 @@
+/**
+ * Root Layout Component
+ *
+ * Defines the root HTML structure and layout for the entire LiveCaps application.
+ * Sets up global providers, fonts, and metadata configuration.
+ *
+ * Features:
+ * - Configures custom ABCFavorit font and Inter Google font
+ * - Provides global context providers for Deepgram and Microphone functionality
+ * - Sets up responsive viewport and SEO metadata
+ * - Defines consistent styling and theming across the application
+ * - Wraps the entire app with necessary context providers for speech and audio handling
+ */
+
 import { Inter } from "next/font/google";
 import classNames from "classnames";
 import localFont from "next/font/local";

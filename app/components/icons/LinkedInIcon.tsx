@@ -1,3 +1,14 @@
+/**
+ * LinkedIn Icon Component
+ * 
+ * SVG icon component displaying the LinkedIn logo.
+ * Used for professional social media integration and networking features.
+ * 
+ * Features:
+ * - Official LinkedIn brand icon
+ * - Professional networking symbol
+ * - Customizable styling via className
+ */
 export const LinkedInIcon = ({ className = "" }) => {
   return (
     <svg

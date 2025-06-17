@@ -1,3 +1,16 @@
+/**
+ * Microphone Icon Component
+ *
+ * SVG icon component that displays different microphone states (open/closed).
+ * Provides visual feedback for microphone status in the application interface.
+ *
+ * Features:
+ * - Dual state display (microphone open vs closed/muted)
+ * - Customizable className for styling
+ * - Responsive SVG design
+ * - Clean iconography for audio recording status
+ */
+
 export const MicrophoneIcon = ({
   micOpen,
   className,

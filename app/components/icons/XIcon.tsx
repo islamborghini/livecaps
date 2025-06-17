@@ -1,3 +1,14 @@
+/**
+ * X Icon Component
+ * 
+ * SVG icon component displaying an X or close symbol.
+ * Used for closing modals, dismissing notifications, or cancel actions.
+ * 
+ * Features:
+ * - Clean, minimal X design
+ * - Universal close/cancel symbol
+ * - Customizable styling options
+ */
 export const XIcon = ({ className = "" }) => {
   return (
     <svg

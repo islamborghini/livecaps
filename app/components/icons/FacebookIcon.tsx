@@ -1,3 +1,14 @@
+/**
+ * Facebook Icon Component
+ * 
+ * SVG icon component displaying the Facebook logo.
+ * Used for social media integration or sharing functionality.
+ * 
+ * Features:
+ * - Official Facebook brand icon
+ * - Customizable styling via className
+ * - Scalable vector format
+ */
 export const FacebookIcon = ({ className = "" }) => {
   return (
     <svg

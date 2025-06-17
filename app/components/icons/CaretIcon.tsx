@@ -1,3 +1,14 @@
+/**
+ * Caret Icon Component
+ * 
+ * SVG icon component displaying a caret/arrow indicator.
+ * Commonly used for dropdown menus, expandable sections, and navigation.
+ * 
+ * Features:
+ * - Simple directional arrow design
+ * - Customizable styling and positioning
+ * - Ideal for UI navigation elements
+ */
 export const CaretIcon = ({ className = "" }) => {
   return (
     <svg

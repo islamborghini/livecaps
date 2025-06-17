@@ -1,3 +1,19 @@
+/**
+ * Audio Visualizer Component
+ * 
+ * Real-time audio visualization component that displays microphone input levels
+ * as animated vertical bars. Creates a visual feedback system for users to 
+ * see their audio input in real-time.
+ * 
+ * Features:
+ * - Real-time audio level visualization with animated bars
+ * - Color interpolation from purple to green based on audio intensity
+ * - Configurable height and responsive design
+ * - 60fps animation updates using requestAnimationFrame
+ * - Audio frequency analysis using Web Audio API
+ * - Visual feedback to confirm microphone is capturing audio
+ */
+
 import React, { useEffect, useRef } from "react";
 
 const interpolateColor = (

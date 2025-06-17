@@ -1,3 +1,21 @@
+/**
+ * Main Application Component
+ * 
+ * Core component that orchestrates real-time speech transcription and translation.
+ * Integrates microphone input, Deepgram speech recognition, and translation services
+ * to provide a live captioning and translation experience.
+ * 
+ * Features:
+ * - Real-time speech-to-text transcription using Deepgram
+ * - Live translation to multiple target languages (Spanish, French, Japanese, etc.)
+ * - Smart sentence detection and paragraph formatting
+ * - Audio visualization with microphone input levels
+ * - Dual-panel layout showing original transcription and translated text
+ * - Language selection dropdown for target translation language
+ * - Auto-scrolling to keep latest content visible
+ * - Interim results display for immediate feedback
+ * - Duplicate text prevention and intelligent text processing
+ */
 "use client";
 
 import { useEffect, useRef, useState } from "react";

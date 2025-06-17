@@ -1,3 +1,21 @@
+/**
+ * Microphone Context Provider
+ *
+ * React context provider that manages microphone access and audio recording functionality.
+ * Handles MediaRecorder API integration and provides audio stream management for
+ * real-time speech transcription.
+ *
+ * Features:
+ * - Microphone permission handling and user consent
+ * - MediaRecorder API integration for audio capture
+ * - Audio stream management with proper cleanup
+ * - Microphone state tracking (setup, recording, inactive)
+ * - Audio data streaming to transcription services
+ * - Error handling for microphone access issues
+ * - Cross-browser compatibility for audio recording
+ * - Custom React hooks for microphone functionality
+ * - Automatic resource cleanup on component unmount
+ */
 "use client";
 
 import {

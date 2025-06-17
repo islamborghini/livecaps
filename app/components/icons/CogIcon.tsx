@@ -1,3 +1,14 @@
+/**
+ * Cog Icon Component
+ * 
+ * SVG icon component displaying a gear/settings symbol.
+ * Used for configuration, settings menus, and administrative functions.
+ * 
+ * Features:
+ * - Classic gear/cog wheel design
+ * - Universal settings symbol
+ * - Customizable styling and sizing
+ */
 export const CogIcon = ({ className = "" }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

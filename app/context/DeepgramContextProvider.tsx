@@ -1,3 +1,19 @@
+/**
+ * Deepgram Context Provider
+ *
+ * React context provider that manages the connection to Deepgram's live transcription service.
+ * Handles WebSocket connections, authentication, and real-time speech-to-text processing.
+ *
+ * Features:
+ * - Live WebSocket connection management to Deepgram API
+ * - Temporary API key authentication via server-side route
+ * - Real-time transcription events handling (interim results, final results, metadata)
+ * - Connection state management (connecting, connected, disconnected)
+ * - Nova-3 model configuration with smart formatting
+ * - Error handling and reconnection logic
+ * - Automatic connection cleanup on component unmount
+ * - Custom React hooks for easy consumption of Deepgram functionality
+ */
 "use client";
 
 import {

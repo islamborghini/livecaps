@@ -1,3 +1,18 @@
+/**
+ * Language Selector Component
+ * 
+ * Dropdown component for selecting target translation languages.
+ * Provides a user-friendly interface to choose from supported languages
+ * for real-time translation of transcribed speech.
+ * 
+ * Features:
+ * - Dropdown interface with native language names
+ * - Support for multiple languages (Spanish, French, Japanese, Korean, Chinese, Russian)
+ * - Clean, accessible UI with hover states
+ * - Language code and display name management
+ * - Callback system for language selection events
+ * - Responsive design with proper styling
+ */
 "use client";
 
 import React, { useState } from 'react';
@@ -97,4 +112,4 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   );
 };
 
-export default LanguageSelector; 
+export default LanguageSelector;
