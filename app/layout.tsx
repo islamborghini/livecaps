@@ -18,6 +18,7 @@ import localFont from "next/font/local";
 
 import { DeepgramContextProvider } from "./context/DeepgramContextProvider";
 import { MicrophoneContextProvider } from "./context/MicrophoneContextProvider";
+import { DarkModeContextProvider } from "./context/DarkModeContextProvider";
 
 import "./globals.css";
 
@@ -54,14 +55,16 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-dvh">
       <body
-        className={`h-full dark ${classNames(
+        className={`h-full ${classNames(
           favorit.variable,
           inter.className
         )}`}
       >
-        <MicrophoneContextProvider>
-          <DeepgramContextProvider>{children}</DeepgramContextProvider>
-        </MicrophoneContextProvider>
+        <DarkModeContextProvider>
+          <MicrophoneContextProvider>
+            <DeepgramContextProvider>{children}</DeepgramContextProvider>
+          </MicrophoneContextProvider>
+        </DarkModeContextProvider>
       </body>
     </html>
   );
