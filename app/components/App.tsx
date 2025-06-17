@@ -52,6 +52,8 @@ const App: () => JSX.Element = () => {
   const keepAliveInterval = useRef<any>();
   const transcriptionContainerRef = useRef<HTMLDivElement>(null);
   const translationContainerRef = useRef<HTMLDivElement>(null);
+  const fullscreenTranscriptionRef = useRef<HTMLDivElement>(null);
+  const fullscreenTranslationRef = useRef<HTMLDivElement>(null);
   const translationTimeout = useRef<NodeJS.Timeout | null>(null);
   const processedFinalTexts = useRef<Set<string>>(new Set());
   const currentSentenceBuffer = useRef<string>("");
@@ -242,18 +244,30 @@ const App: () => JSX.Element = () => {
   useEffect(() => {
     // Ensure scrolling happens after the DOM update
     const scrollToBottom = () => {
-      if (transcriptionContainerRef.current) {
-        transcriptionContainerRef.current.scrollTop = transcriptionContainerRef.current.scrollHeight;
-      }
-      
-      if (translationContainerRef.current) {
-        translationContainerRef.current.scrollTop = translationContainerRef.current.scrollHeight;
+      if (isFullscreen) {
+        // Scroll fullscreen mode containers
+        if (fullscreenTranscriptionRef.current) {
+          fullscreenTranscriptionRef.current.scrollTop = fullscreenTranscriptionRef.current.scrollHeight;
+        }
+        
+        if (fullscreenTranslationRef.current) {
+          fullscreenTranslationRef.current.scrollTop = fullscreenTranslationRef.current.scrollHeight;
+        }
+      } else {
+        // Scroll normal mode containers
+        if (transcriptionContainerRef.current) {
+          transcriptionContainerRef.current.scrollTop = transcriptionContainerRef.current.scrollHeight;
+        }
+        
+        if (translationContainerRef.current) {
+          translationContainerRef.current.scrollTop = translationContainerRef.current.scrollHeight;
+        }
       }
     };
     
     // Use requestAnimationFrame to ensure scrolling happens after render
     requestAnimationFrame(scrollToBottom);
-  }, [completeSentences, currentInterimText, translatedSentences]);
+  }, [completeSentences, currentInterimText, translatedSentences, isFullscreen]);
 
   useEffect(() => {
     if (!connection) return;
@@ -279,33 +293,53 @@ const App: () => JSX.Element = () => {
 
   // Set up mutation observer for better scroll handling
   useEffect(() => {
-    if (!transcriptionContainerRef.current || !translationContainerRef.current) return;
-    
     // Create a function to scroll to bottom
     const scrollToBottom = (element: HTMLElement) => {
       element.scrollTop = element.scrollHeight;
     };
     
-    // Create mutation observers
     const transcriptionObserver = new MutationObserver(() => {
-      scrollToBottom(transcriptionContainerRef.current!);
+      if (isFullscreen && fullscreenTranscriptionRef.current) {
+        scrollToBottom(fullscreenTranscriptionRef.current);
+      } else if (!isFullscreen && transcriptionContainerRef.current) {
+        scrollToBottom(transcriptionContainerRef.current);
+      }
     });
     
     const translationObserver = new MutationObserver(() => {
-      scrollToBottom(translationContainerRef.current!);
+      if (isFullscreen && fullscreenTranslationRef.current) {
+        scrollToBottom(fullscreenTranslationRef.current);
+      } else if (!isFullscreen && translationContainerRef.current) {
+        scrollToBottom(translationContainerRef.current);
+      }
     });
     
     // Configure and start observers
     const observerConfig = { childList: true, subtree: true, characterData: true };
-    transcriptionObserver.observe(transcriptionContainerRef.current, observerConfig);
-    translationObserver.observe(translationContainerRef.current, observerConfig);
+    
+    // Start observers based on current mode
+    if (isFullscreen) {
+      if (fullscreenTranscriptionRef.current) {
+        transcriptionObserver.observe(fullscreenTranscriptionRef.current, observerConfig);
+      }
+      if (fullscreenTranslationRef.current) {
+        translationObserver.observe(fullscreenTranslationRef.current, observerConfig);
+      }
+    } else {
+      if (transcriptionContainerRef.current) {
+        transcriptionObserver.observe(transcriptionContainerRef.current, observerConfig);
+      }
+      if (translationContainerRef.current) {
+        translationObserver.observe(translationContainerRef.current, observerConfig);
+      }
+    }
     
     // Clean up observers on unmount
     return () => {
       transcriptionObserver.disconnect();
       translationObserver.disconnect();
     };
-  }, []);
+  }, [isFullscreen]); // Re-run when fullscreen mode changes
 
   // Handle language changes - retranslate existing sentences when language changes
   useEffect(() => {
@@ -364,9 +398,9 @@ const App: () => JSX.Element = () => {
           </div>
           
           {/* Fullscreen Transcription Panels */}
-          <div className="flex-1 grid grid-cols-2 overflow-hidden">
+          <div className="flex-1 grid grid-cols-2 overflow-hidden min-h-0">
             {/* Original Transcription - Fullscreen */}
-            <div className="bg-white border-r border-gray-200 flex flex-col">
+            <div className="bg-white border-r border-gray-200 flex flex-col min-h-0">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -376,8 +410,8 @@ const App: () => JSX.Element = () => {
                 </h2>
               </div>
               <div 
-                ref={transcriptionContainerRef}
-                className="flex-1 p-8 overflow-y-auto text-gray-900 text-2xl leading-relaxed"
+                ref={fullscreenTranscriptionRef}
+                className="flex-1 min-h-0 p-8 overflow-y-auto text-gray-900 text-2xl leading-relaxed"
               >
                 {displayTranscription() ? (
                   <div className="whitespace-pre-wrap">
@@ -397,7 +431,7 @@ const App: () => JSX.Element = () => {
             </div>
             
             {/* Translation - Fullscreen */}
-            <div className="bg-white flex flex-col">
+            <div className="bg-white flex flex-col min-h-0">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,8 +442,8 @@ const App: () => JSX.Element = () => {
                 </h2>
               </div>
               <div 
-                ref={translationContainerRef}
-                className={`flex-1 p-8 overflow-y-auto text-gray-900 text-2xl leading-relaxed lang-${selectedLanguage.code}`}
+                ref={fullscreenTranslationRef}
+                className={`flex-1 min-h-0 p-8 overflow-y-auto text-gray-900 text-2xl leading-relaxed lang-${selectedLanguage.code}`}
               >
                 {displayTranslation() ? (
                   <div className="whitespace-pre-wrap">
