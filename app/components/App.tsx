@@ -326,64 +326,113 @@ const App: () => JSX.Element = () => {
   }, [selectedLanguage.code]); // Only depend on language code - completeSentences is accessed from latest state
 
   return (
-    <div className="flex flex-col h-full w-full">
-      {/* Language selector */}
-      <div className="flex justify-end mb-2 mt-2">
-        <div className="flex items-center gap-2">
-          <span className="text-gray-300">Translate to:</span>
-          <LanguageSelector 
-            selectedLanguage={selectedLanguage} 
-            onLanguageChange={setSelectedLanguage} 
-          />
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Control Panel */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className={`w-4 h-4 rounded-full ${
+              connectionState === LiveConnectionState.OPEN ? 'bg-green-500' : 
+              connectionState === LiveConnectionState.CONNECTING ? 'bg-yellow-500' : 'bg-gray-400'
+            }`} />
+            <span className="text-base font-medium text-gray-700">
+              {connectionState === LiveConnectionState.OPEN ? 'Connected' : 
+               connectionState === LiveConnectionState.CONNECTING ? 'Connecting...' : 'Disconnected'}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <label className="text-base font-medium text-gray-700">Translate to:</label>
+            <LanguageSelector 
+              selectedLanguage={selectedLanguage} 
+              onLanguageChange={setSelectedLanguage} 
+            />
+          </div>
         </div>
       </div>
-      
-      {/* Split screen */}
-      <div className="flex flex-1 w-full flex-col md:flex-row overflow-hidden">
-        {/* Left half - Transcription */}
-        <div className="w-full md:w-1/2 h-full flex flex-col border-b md:border-b-0 md:border-r border-gray-700/30 overflow-hidden">
-          <div className="p-2 text-center border-b border-gray-700/30">
-            <h2 className="text-lg font-semibold text-gray-300">Original</h2>
+
+      {/* Transcription Interface */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Original Transcription */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 px-8 py-5 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              Original
+            </h2>
           </div>
           <div 
             ref={transcriptionContainerRef}
-            className="flex-1 p-4 md:p-8 overflow-y-auto text-left text-xl md:text-2xl lg:text-3xl font-light transcription-panel"
+            className="h-96 p-8 overflow-y-auto text-gray-900 text-xl leading-relaxed"
           >
             {displayTranscription() ? (
-              <div className="whitespace-pre-wrap break-words">
+              <div className="whitespace-pre-wrap">
                 {displayTranscription()}
               </div>
             ) : (
-              <span className="text-gray-500">Speak to see transcription here...</span>
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  <p className="text-lg">Start speaking to see transcription here</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
         
-        {/* Right half - Translation */}
-        <div className="w-full md:w-1/2 h-full flex flex-col overflow-hidden">
-          <div className="p-2 text-center border-b border-gray-700/30">
-            <h2 className="text-lg font-semibold text-gray-300">
-              {selectedLanguage.name} ({selectedLanguage.nativeName})
+        {/* Translation */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 px-8 py-5 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-3">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+              </svg>
+              {selectedLanguage.name}
+              <span className="text-base font-normal text-gray-500">({selectedLanguage.nativeName})</span>
             </h2>
           </div>
           <div 
             ref={translationContainerRef}
-            className={`flex-1 p-4 md:p-8 overflow-y-auto text-left text-xl md:text-2xl lg:text-3xl font-light transcription-panel lang-${selectedLanguage.code}`}
+            className={`h-96 p-8 overflow-y-auto text-gray-900 text-xl leading-relaxed lang-${selectedLanguage.code}`}
           >
             {displayTranslation() ? (
-              <div className="whitespace-pre-wrap break-words">
+              <div className="whitespace-pre-wrap">
                 {displayTranslation()}
               </div>
             ) : (
-              <span className="text-gray-500">Translation will appear here...</span>
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                  </svg>
+                  <p className="text-lg">Translation will appear here</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
       </div>
-      
-      {/* Visualizer */}
-      <div className="h-16 md:h-24 p-2 md:p-4 flex items-center justify-center">
-        {microphone && <Visualizer microphone={microphone} height={80} />}
+
+      {/* Audio Visualizer */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="text-center">
+          <h3 className="text-base font-medium text-gray-700 mb-6">Audio Input</h3>
+          <div className="flex items-center justify-center">
+            {microphone ? (
+              <Visualizer microphone={microphone} height={80} />
+            ) : (
+              <div className="h-20 flex items-center justify-center text-gray-400">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

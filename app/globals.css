@@ -7,13 +7,13 @@
  */
 :root {
   background: #0b0b0c;
-  font-size: 22.5px; /* Changed from 25px to 90% scale (22.5px) */
+  font-size: 1.1rem; /* Changed from 25px to 90% scale (22.5px) */
   color-scheme: dark;
 }
 
 @media only screen and (min-width: 2000px) {
   :root {
-    font-size: 19.8px; /* Changed from 22px to 90% scale (19.8px) */
+    font-size: 1.4rem /* Changed from 22px to 90% scale (19.8px) */
   }
 }
 
@@ -50,15 +50,28 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
   line-height: 1.6;
   letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgb(17, 24, 39);
   overflow-y: auto;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: thin;
+  scrollbar-color: rgb(209, 213, 219) transparent;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+/* Custom scrollbar for webkit browsers */
 .transcription-panel::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.transcription-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.transcription-panel::-webkit-scrollbar-thumb {
+  background: rgb(209, 213, 219);
+  border-radius: 3px;
+}
+
+.transcription-panel::-webkit-scrollbar-thumb:hover {
+  background: rgb(156, 163, 175);
 }
 
 /* Language-specific text styles */
@@ -98,4 +111,93 @@ body {
 
 .animate-pulse {
   animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Landing page animations and enhancements */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
+
+/* Hero button hover effects */
+.hero-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.hero-button:hover::before {
+  left: 100%;
+}
+
+/* Feature card enhancements */
+.feature-card {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem;
+  padding: 1px;
+  background: linear-gradient(135deg, #13ef93, #149afb);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: xor;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.feature-card:hover::before {
+  opacity: 0.5;
+}
+
+/* Responsive text scaling */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2.5rem;
+    line-height: 1.2;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.125rem;
+  }
 }
