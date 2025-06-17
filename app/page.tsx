@@ -42,7 +42,7 @@ const Home = () => {
         
         <div className="relative z-10 mx-auto max-w-7xl px-4 md:px-6 lg:px-8">
           {/* Hero Content */}
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] text-center pt-6 md:pt-8">
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] text-center pt-16 md:pt-20 lg:pt-24">
             <div className="max-w-4xl mx-auto">
               {/* Main Headline */}
               <h1 className="hero-title text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6 animate-fade-in-up">
@@ -64,7 +64,7 @@ const Home = () => {
               {/* CTA Button */}
               <Link 
                 href="/app"
-                className="hero-button inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-black bg-gradient-to-r from-[#13ef93] to-[#149afb] rounded-xl hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl animate-fade-in-up"
+                className="hero-button inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-black bg-gradient-to-r from-[#13ef93] to-[#149afb] rounded-xl hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl animate-fade-in-up mb-16"
                 style={{animationDelay: '0.4s'}}
               >
                 Start Transcribing Now
@@ -126,7 +126,7 @@ const Home = () => {
               </div>
 
               {/* Secondary CTA */}
-              <div className="mt-12 text-center">
+              <div className="mt-12 text-center mb-16">
                 <p className="text-gray-400 mb-4">
                   No signup required • Works in your browser • Powered by Deepgram & DeepL
                 </p>
