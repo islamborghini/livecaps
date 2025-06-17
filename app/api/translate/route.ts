@@ -39,16 +39,18 @@ async function translateWithDeepL(text: string, targetLanguage: string) {
   // Get API key from environment variable
   const apiKey = process.env.DEEPL_API_KEY;
   
-  if (!apiKey || apiKey === 'your_deepl_api_key_here') {
-    console.warn('DeepL API key is missing or not properly configured. Please check your .env.local file.');
-    throw new Error('DeepL API key not configured properly');
+  if (!apiKey || apiKey === 'your_deepl_api_key_here' || apiKey.trim() === '') {
+    // Silently skip DeepL if API key is not configured - this is expected behavior
+    throw new Error('DeepL API key not configured - using fallback');
   }
+  
+  console.log('🔄 Using DeepL for translation...');
   
   try {
     // Convert language codes if necessary (DeepL uses different codes than Google for some languages)
     const deepLLanguage = convertToDeepLCode(targetLanguage);
     
-    console.log(`Using DeepL for translation to language: ${deepLLanguage}`);
+    console.log(`📝 Translating to DeepL language code: ${deepLLanguage}`);
     
     // DeepL API endpoint
     const url = 'https://api-free.deepl.com/v2/translate';
@@ -74,8 +76,9 @@ async function translateWithDeepL(text: string, targetLanguage: string) {
     
     // Extract translation from DeepL's response
     if (data && data.translations && data.translations.length > 0) {
-      console.log('Successfully used DeepL for translation');
-      return data.translations[0].text;
+      const translatedText = data.translations[0].text;
+      console.log('✅ DeepL translation successful!');
+      return translatedText;
     }
     
     throw new Error('Invalid response format from DeepL');
@@ -146,24 +149,27 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // First try to use DeepL
+      // First try to use DeepL (if configured)
       try {
         const translatedText = await translateWithDeepL(text, targetLanguage);
         return NextResponse.json({ 
           translatedText, 
-          provider: "deepl" 
+          provider: "deepl",
+          message: "Translation successful using DeepL"
         });
       } catch (deepLError) {
-        console.error("DeepL translation error:", deepLError);
+        // Only log actual DeepL API errors, not configuration issues
+        if (deepLError instanceof Error && !deepLError.message.includes('not configured')) {
+          console.error("❌ DeepL translation error:", deepLError);
+        }
         
-        console.log("Falling back to Google Translate");
-        
-        // Fall back to Google Translate
+        // Fall back to Google Translate (this is expected when DeepL is not configured)
+        console.log('🔄 Falling back to Google Translate...');
         const translatedText = await translateWithGoogle(text, targetLanguage);
         return NextResponse.json({ 
           translatedText, 
           provider: "google",
-          note: "Used fallback due to DeepL API error"
+          message: "Translation successful using Google Translate (fallback)"
         });
       }
     } catch (error) {

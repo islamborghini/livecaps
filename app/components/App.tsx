@@ -35,28 +35,26 @@ import LanguageSelector, { Language, languages } from "./LanguageSelector";
 import { detectSentences, processSentencesForTranslation, translateBySentences } from "../services/translationService";
 
 const App: () => JSX.Element = () => {
-  // Enhanced state management for transcription
-  const [transcription, setTranscription] = useState<string>("");
-  const [translatedText, setTranslatedText] = useState<string>("");
+  // State management for sentence-based transcription and translation
+  const [completeSentences, setCompleteSentences] = useState<string[]>([]);
+  const [translatedSentences, setTranslatedSentences] = useState<string[]>([]);
+  const [currentInterimText, setCurrentInterimText] = useState<string>("");
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(languages[0]);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
-  const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>(languages[0]); // Default to Spanish
+  
   const { connection, connectToDeepgram, connectionState } = useDeepgram();
   const { setupMicrophone, microphone, startMicrophone, microphoneState } =
     useMicrophone();
+  
+  // Refs for managing transcription flow
   const keepAliveInterval = useRef<any>();
   const transcriptionContainerRef = useRef<HTMLDivElement>(null);
   const translationContainerRef = useRef<HTMLDivElement>(null);
   const translationTimeout = useRef<NodeJS.Timeout | null>(null);
-  
-  // Enhanced refs for sentence management
-  const transcriptHistory = useRef<Set<string>>(new Set());
-  const completeSentences = useRef<string[]>([]); // For storing complete sentences
-  const currentSentenceRef = useRef<string>(""); // For tracking current incomplete sentence
-  const lastUtteranceTime = useRef<number>(Date.now()); // Add missing ref
-  const lastFinalText = useRef<string>("");
-  const lastInterimWasNewSentence = useRef<boolean>(false);
-  const sentenceBoundaryDetected = useRef<boolean>(false);
+  const processedFinalTexts = useRef<Set<string>>(new Set());
+  const currentSentenceBuffer = useRef<string>("");
+  const lastProcessedLength = useRef<number>(0);
+  const currentLanguageRef = useRef<string>(selectedLanguage.code); // Track current language
   
   useEffect(() => {
     setupMicrophone();
@@ -70,68 +68,74 @@ const App: () => JSX.Element = () => {
         interim_results: true,
         smart_format: true,
         filler_words: true,
-        utterance_end_ms: 2000, // Detect pauses after 2 seconds
+        utterance_end_ms: 1500, // Detect pauses after 1.5 seconds for better sentence detection
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microphoneState]);
 
-  // Handle translation of the transcription with improved sentence formatting
+  // Update the current language ref whenever selectedLanguage changes
   useEffect(() => {
-    // Only translate when we have text and a language selected
-    if (!transcription.trim()) {
-      setTranslatedText("");
-      setIsTranslating(false);
-      return;
-    }
+    currentLanguageRef.current = selectedLanguage.code;
+  }, [selectedLanguage.code]);
 
-    if (translationTimeout.current) {
-      clearTimeout(translationTimeout.current);
+  // Helper function to detect complete sentences
+  const detectCompleteSentences = (text: string): string[] => {
+    if (!text.trim()) return [];
+    
+    // Split by sentence-ending punctuation, keeping the punctuation
+    const sentences = text.split(/([.!?]+)/).filter(Boolean);
+    const completeSentences: string[] = [];
+    
+    for (let i = 0; i < sentences.length; i += 2) {
+      const sentence = sentences[i];
+      const punctuation = sentences[i + 1];
+      
+      if (sentence && punctuation) {
+        const fullSentence = (sentence + punctuation).trim();
+        if (fullSentence.length > 0) {
+          completeSentences.push(fullSentence);
+        }
+      }
     }
+    
+    return completeSentences;
+  };
 
-    // Translate with a slight delay to avoid excessive API calls
+  // Enhanced translation function with context
+  const translateSentencesWithContext = async (sentences: string[], targetLanguage: string) => {
+    if (sentences.length === 0) return [];
+    
     setIsTranslating(true);
-    translationTimeout.current = setTimeout(async () => {
-      try {
-        // Use the enhanced translation service that preserves paragraph structure
-        const result = await translateBySentences({
-          text: transcription,
-          sourceLanguage: "auto",
-          targetLanguage: selectedLanguage.code
-        });
-        
-        setTranslatedText(result.translatedText);
-      } catch (error) {
-        console.error("Translation error:", error);
-      } finally {
-        setIsTranslating(false);
-      }
-    }, 600); // Reduced for better responsiveness
-
-    return () => {
-      if (translationTimeout.current) {
-        clearTimeout(translationTimeout.current);
-      }
-    };
-  }, [transcription, selectedLanguage]);
-  
-  // Helper functions for sentence detection
-  const isSentenceEnd = (text: string): boolean => {
-    if (!text) return false;
-    // Check if text ends with sentence-ending punctuation
-    return /[.!?…][ "\n]*$/.test(text);
-  };
-  
-  const startsNewSentence = (text: string): boolean => {
-    if (!text) return false;
-    // Check if text starts with a capital letter after trimming spaces
-    const trimmed = text.trim();
-    return trimmed.length > 0 && /^[A-Z]/.test(trimmed);
-  };
-  
-  const hasSignificantPause = (timeSinceLastUtterance: number): boolean => {
-    // Consider a pause over 1 second as significant for sentence boundary
-    return timeSinceLastUtterance > 1000;
+    
+    try {
+      // For context, include the last 2 sentences (if available) plus the new sentences
+      const contextSentences = completeSentences.slice(-2);
+      const textWithContext = [...contextSentences, ...sentences].join(' ');
+      
+      const result = await translateBySentences({
+        text: textWithContext,
+        sourceLanguage: "auto",
+        targetLanguage: targetLanguage
+      });
+      
+      // Extract only the new translations (skip the context part)
+      const translatedWithContext = result.translatedText.split(/[.!?]+/).filter(s => s.trim());
+      const newTranslations = translatedWithContext.slice(-sentences.length);
+      
+      // Ensure we have proper sentence endings
+      return newTranslations.map((translation, index) => {
+        const originalSentence = sentences[index];
+        const lastChar = originalSentence.slice(-1);
+        return translation.trim() + (lastChar.match(/[.!?]/) ? lastChar : '.');
+      });
+      
+    } catch (error) {
+      console.error("Translation error:", error);
+      return sentences.map(() => "Translation failed");
+    } finally {
+      setIsTranslating(false);
+    }
   };
 
   useEffect(() => {
@@ -147,86 +151,47 @@ const App: () => JSX.Element = () => {
     };
 
     const onTranscript = (data: LiveTranscriptionEvent) => {
-      const { is_final: isFinal, speech_final: speechFinal } = data;
+      const { is_final: isFinal } = data;
       let thisCaption = data.channel.alternatives[0].transcript.trim();
 
       if (thisCaption === "") return;
       
-      const currentTime = Date.now();
-      const timeSinceLastUtterance = currentTime - lastUtteranceTime.current;
-      lastUtteranceTime.current = currentTime;
-      
-      // Detect if there's been a significant pause that might indicate sentence boundary
-      const pauseDetected = hasSignificantPause(timeSinceLastUtterance);
-      
-      // Enhanced handling that preserves sentence boundaries
       if (isFinal) {
         // Prevent duplicate processing
-        if (transcriptHistory.current.has(thisCaption)) {
+        if (processedFinalTexts.current.has(thisCaption)) {
           return;
         }
         
-        // Store in history to avoid duplicates
-        transcriptHistory.current.add(thisCaption);
-        lastFinalText.current = thisCaption;
+        processedFinalTexts.current.add(thisCaption);
         
-        // Process the final text as complete sentences
-        const extractedSentences = detectSentences(thisCaption);
-        if (extractedSentences.length > 0) {
-          // Update the complete sentences with newly detected ones
-          const formattedSentences = extractedSentences.map(s => s.trim());
+        // Add the buffer content + new final text
+        const fullText = currentSentenceBuffer.current + " " + thisCaption;
+        const sentences = detectCompleteSentences(fullText.trim());
+        
+        if (sentences.length > 0) {
+          // Add new complete sentences
+          const newSentences = [...sentences];
+          setCompleteSentences(prev => [...prev, ...newSentences]);
           
-          // Update transcription with proper paragraph breaks between sentences
-          setTranscription(prev => {
-            if (!prev) return formattedSentences.join('\n\n');
-            
-            return prev + '\n\n' + formattedSentences.join('\n\n');
-          });
+          // Translate the new sentences with context using current language
+          translateSentencesWithContext(newSentences, currentLanguageRef.current)
+            .then(translations => {
+              setTranslatedSentences(prev => [...prev, ...translations]);
+            });
           
-          // Store the complete sentences for reference
-          completeSentences.current = [
-            ...completeSentences.current,
-            ...formattedSentences
-          ];
-          
-          // Clear the current sentence being built
-          currentSentenceRef.current = "";
+          // Clear the buffer as we've processed complete sentences
+          currentSentenceBuffer.current = "";
         } else {
-          // If no complete sentences detected but text is available, 
-          // add it as a paragraph
-          setTranscription(prev => {
-            if (!prev) return thisCaption;
-            return prev + '\n\n' + thisCaption;
-          });
-          
-          currentSentenceRef.current = "";
+          // No complete sentences, keep in buffer
+          currentSentenceBuffer.current = fullText;
         }
         
-        // Clear interim transcript after processing final text
-        setInterimTranscript("");
-        lastInterimWasNewSentence.current = false;
-        sentenceBoundaryDetected.current = false;
+        // Clear interim display
+        setCurrentInterimText("");
         
       } else {
-        // Handle interim results with improved sentence boundary detection
-        
-        // Skip if identical to last final text
-        if (thisCaption === lastFinalText.current) {
-          setInterimTranscript("");
-          return;
-        }
-        
-        // Check if this interim text starts a new sentence
-        const isNewSentence = startsNewSentence(thisCaption) || 
-                             (pauseDetected && thisCaption.trim().length > 0) ||
-                             sentenceBoundaryDetected.current;
-        
-        // Update the sentence boundary detection status
-        sentenceBoundaryDetected.current = isSentenceEnd(thisCaption);
-        
-        // Display interim text in a way that respects sentence boundaries
-        setInterimTranscript(thisCaption);
-        lastInterimWasNewSentence.current = isNewSentence;
+        // Show interim results without breaking sentences
+        setCurrentInterimText(thisCaption);
       }
     };
 
@@ -234,30 +199,41 @@ const App: () => JSX.Element = () => {
       connection.addListener(LiveTranscriptionEvents.Transcript, onTranscript);
       microphone.addEventListener(MicrophoneEvents.DataAvailable, onData);
 
-      startMicrophone();
+      // Only start microphone if it's not already recording
+      if (microphone.state !== "recording") {
+        startMicrophone();
+      }
     }
 
     return () => {
-      // prettier-ignore
       connection.removeListener(LiveTranscriptionEvents.Transcript, onTranscript);
       microphone.removeEventListener(MicrophoneEvents.DataAvailable, onData);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionState]);
+  }, [connectionState]); // Removed selectedLanguage.code from dependencies
 
-  // Generate the combined display transcription with improved formatting
+  // Generate display text for transcription
   const displayTranscription = () => {
-    if (!transcription && !interimTranscript) return "";
+    const sentencesText = completeSentences.join('\n\n');
+    const bufferText = currentSentenceBuffer.current;
+    const interimText = currentInterimText;
     
-    // If we have interim text that represents a new sentence,
-    // display it with a paragraph break
-    if (interimTranscript && lastInterimWasNewSentence.current) {
-      return transcription + (transcription ? '\n\n' : '') + interimTranscript;
+    let result = sentencesText;
+    
+    if (bufferText) {
+      result += (result ? '\n\n' : '') + bufferText;
     }
     
-    // Otherwise, display interim text in the same paragraph as it's continuing
-    // the current sentence
-    return transcription + (interimTranscript ? ' ' + interimTranscript : '');
+    if (interimText) {
+      result += (bufferText ? ' ' : (result ? '\n\n' : '')) + interimText;
+    }
+    
+    return result;
+  };
+
+  // Generate display text for translation
+  const displayTranslation = () => {
+    return translatedSentences.join('\n\n') + (isTranslating ? '\n\n[Translating...]' : '');
   };
 
   // Scroll to bottom when transcription updates
@@ -275,7 +251,7 @@ const App: () => JSX.Element = () => {
     
     // Use requestAnimationFrame to ensure scrolling happens after render
     requestAnimationFrame(scrollToBottom);
-  }, [transcription, interimTranscript, translatedText]);
+  }, [completeSentences, currentInterimText, translatedSentences]);
 
   useEffect(() => {
     if (!connection) return;
@@ -329,6 +305,26 @@ const App: () => JSX.Element = () => {
     };
   }, []);
 
+  // Handle language changes - retranslate existing sentences when language changes
+  useEffect(() => {
+    if (completeSentences.length === 0) return;
+    
+    // When language changes, retranslate all existing complete sentences
+    console.log(`🔄 Language changed to ${selectedLanguage.name}, retranslating existing sentences...`);
+    
+    const retranslate = async () => {
+      try {
+        const translations = await translateSentencesWithContext(completeSentences, selectedLanguage.code);
+        setTranslatedSentences(translations);
+      } catch (error) {
+        console.error('Error retranslating sentences:', error);
+      }
+    };
+    
+    retranslate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLanguage.code]); // Only depend on language code - completeSentences is accessed from latest state
+
   return (
     <div className="flex flex-col h-full w-full">
       {/* Language selector */}
@@ -374,9 +370,9 @@ const App: () => JSX.Element = () => {
             ref={translationContainerRef}
             className={`flex-1 p-4 md:p-8 overflow-y-auto text-left text-xl md:text-2xl lg:text-3xl font-light transcription-panel lang-${selectedLanguage.code}`}
           >
-            {translatedText ? (
+            {displayTranslation() ? (
               <div className="whitespace-pre-wrap break-words">
-                {translatedText}
+                {displayTranslation()}
               </div>
             ) : (
               <span className="text-gray-500">Translation will appear here...</span>
