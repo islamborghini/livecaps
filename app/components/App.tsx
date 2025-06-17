@@ -328,21 +328,21 @@ const App: () => JSX.Element = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Control Panel */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className={`w-4 h-4 rounded-full ${
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${
               connectionState === LiveConnectionState.OPEN ? 'bg-green-500' : 
               connectionState === LiveConnectionState.CONNECTING ? 'bg-yellow-500' : 'bg-gray-400'
             }`} />
-            <span className="text-base font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-700">
               {connectionState === LiveConnectionState.OPEN ? 'Connected' : 
                connectionState === LiveConnectionState.CONNECTING ? 'Connecting...' : 'Disconnected'}
             </span>
           </div>
           
-          <div className="flex items-center gap-4">
-            <label className="text-base font-medium text-gray-700">Translate to:</label>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Translate to:</label>
             <LanguageSelector 
               selectedLanguage={selectedLanguage} 
               onLanguageChange={setSelectedLanguage} 
@@ -418,18 +418,25 @@ const App: () => JSX.Element = () => {
       </div>
 
       {/* Audio Visualizer */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <div className="text-center">
-          <h3 className="text-base font-medium text-gray-700 mb-6">Audio Input</h3>
-          <div className="flex items-center justify-center">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 bg-blue-50 rounded-full">
+              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-gray-700">Audio Input</span>
+          </div>
+          
+          <div className="flex items-center">
             {microphone ? (
-              <Visualizer microphone={microphone} height={80} />
-            ) : (
-              <div className="h-20 flex items-center justify-center text-gray-400">
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
+              <div className="flex items-center gap-2">
+                <Visualizer microphone={microphone} height={40} />
+                <span className="text-xs text-green-600 font-medium">Recording</span>
               </div>
+            ) : (
+              <span className="text-xs text-gray-400">No microphone detected</span>
             )}
           </div>
         </div>
