@@ -6,15 +6,41 @@
  */
 "use client";
 
-const Footer = () => {
+interface FooterProps {
+  forceDark?: boolean;
+}
+
+const Footer = ({ forceDark = false }: FooterProps) => {
+  const footerClasses = forceDark 
+    ? "bg-[#0b0b0c] border-t border-gray-700 py-6 px-4 md:px-6 lg:px-8"
+    : "bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 py-6 px-4 md:px-6 lg:px-8 transition-colors duration-200";
+  
+  const textClasses = forceDark
+    ? "text-gray-400"
+    : "text-gray-600 dark:text-gray-400";
+    
+  const linkClasses = forceDark
+    ? "text-gray-400 hover:text-white"
+    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-200";
+    
+  const brandClasses = forceDark
+    ? {
+        deepgram: "text-blue-400 font-medium",
+        deepl: "text-green-400 font-medium"
+      }
+    : {
+        deepgram: "text-blue-600 dark:text-blue-400 font-medium",
+        deepl: "text-green-600 dark:text-green-400 font-medium"
+      };
+
   return (
-    <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 py-6 px-4 md:px-6 lg:px-8 transition-colors duration-200">
+    <footer className={footerClasses}>
       <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="text-gray-600 dark:text-gray-400 text-sm text-center md:text-left">
+        <div className={`${textClasses} text-sm text-center md:text-left`}>
           <p>
             Built with{" "}
-            <span className="text-blue-600 dark:text-blue-400 font-medium">Deepgram</span> and{" "}
-            <span className="text-green-600 dark:text-green-400 font-medium">DeepL</span>
+            <span className={brandClasses.deepgram}>Deepgram</span> and{" "}
+            <span className={brandClasses.deepl}>DeepL</span>
           </p>
         </div>
         
@@ -23,7 +49,7 @@ const Footer = () => {
             href="https://github.com/islamborghini"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
+            className={`flex items-center gap-2 ${linkClasses}`}
           >
             <svg
               className="w-5 h-5"
@@ -40,7 +66,7 @@ const Footer = () => {
             <span>GitHub</span>
           </a>
           
-          <div className="text-gray-500 dark:text-gray-500 text-sm">
+          <div className={`${forceDark ? 'text-gray-500' : 'text-gray-500 dark:text-gray-500'} text-sm`}>
             <span>LiveCaps v1.0</span>
           </div>
         </div>

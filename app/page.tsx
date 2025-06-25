@@ -143,7 +143,7 @@ const Home = () => {
       </main>
       
       {/* Footer */}
-      <Footer />
+      <Footer forceDark={true} />
     </div>
   );
 };
