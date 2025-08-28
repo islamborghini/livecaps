@@ -33,7 +33,7 @@ import {
 } from "../context/MicrophoneContextProvider";
 import Visualizer from "./Visualizer";
 import LanguageSelector, { Language, languages } from "./LanguageSelector";
-import { detectSentences, processSentencesForTranslation, translateBySentences } from "../services/translationService";
+import { detectSentences, processSentencesForTranslation, translateBySentences, cacheUtils } from "../services/translationService";
 
 const App: () => JSX.Element = () => {
   // State management for sentence-based transcription and translation
@@ -81,6 +81,13 @@ const App: () => JSX.Element = () => {
   // Update the current language ref whenever selectedLanguage changes
   useEffect(() => {
     currentLanguageRef.current = selectedLanguage.code;
+    
+    // Preload common phrases for the new language in the background using backend cache
+    if (selectedLanguage.code !== 'en') {
+      cacheUtils.preloadCommonPhrases(selectedLanguage.code).catch(error => {
+        console.warn('Failed to preload common phrases:', error);
+      });
+    }
   }, [selectedLanguage.code]);
 
   // Helper function to detect complete sentences

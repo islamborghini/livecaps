@@ -1,8 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-
 /**
- * Translation service using our API endpoint
- * This service handles the translation of text using multiple fallback options
+ * Translation service using backend API with server-side caching
+ * This service handles the translation of text using backend caching for improved performance
  */
 
 export interface TranslationRequest {
@@ -15,6 +13,7 @@ export interface TranslationResponse {
   translatedText: string;
   error?: string;
   provider?: string;
+  cached?: boolean;
 }
 
 /**
@@ -88,7 +87,7 @@ export function processSentencesForTranslation(text: string): string {
 
 /**
  * Translate text while preserving paragraph structure
- * This ensures each sentence is properly formatted before translation
+ * This function handles sentence-by-sentence translation using backend caching
  */
 export async function translateBySentences(request: TranslationRequest): Promise<TranslationResponse> {
   // If the text is empty, return empty result
@@ -97,46 +96,49 @@ export async function translateBySentences(request: TranslationRequest): Promise
   }
   
   try {
-    // Process text to ensure proper sentence formatting - each sentence on its own line
+    // For better caching, try translating the full text first
+    const fullTextResult = await translateText(request);
+    
+    // If successful, return the result
+    if (!fullTextResult.error) {
+      return fullTextResult;
+    }
+    
+    // If full text translation failed, try sentence by sentence
+    console.log('Full text translation failed, trying sentence by sentence...');
+    
+    // Process text to ensure proper sentence formatting
     const formattedText = processSentencesForTranslation(request.text);
     
     // Split into paragraphs to translate each separately
-    const paragraphs = formattedText.split('\n\n');
+    const paragraphs = formattedText.split('\n\n').filter(p => p.trim());
     
-    // Batch paragraphs for efficient translation (max 5 at a time)
-    const batchSize = 5;
-    const batches: string[][] = [];
-    
-    for (let i = 0; i < paragraphs.length; i += batchSize) {
-      batches.push(paragraphs.slice(i, i + batchSize));
-    }
-    
-    // Translate each batch
-    const translatedBatches = await Promise.all(
-      batches.map(async (batch) => {
-        // Join batch with special separator that won't appear in normal text
-        const batchText = batch.join('\n\u2022\n');
+    // Translate each paragraph
+    const translatedParagraphs = await Promise.all(
+      paragraphs.map(async (paragraph) => {
+        if (!paragraph.trim()) return '';
         
-        if (!batchText.trim()) return [];
-        
-        const result = await translateText({
-          text: batchText,
-          sourceLanguage: request.sourceLanguage,
-          targetLanguage: request.targetLanguage
-        });
-        
-        // Split the translated text back into paragraphs
-        return result.translatedText.split('\n\u2022\n');
+        try {
+          const result = await translateText({
+            text: paragraph,
+            sourceLanguage: request.sourceLanguage,
+            targetLanguage: request.targetLanguage
+          });
+          
+          return result.translatedText;
+        } catch (error) {
+          console.error('Failed to translate paragraph:', error);
+          return paragraph; // Return original if translation fails
+        }
       })
     );
     
-    // Flatten the batches back into a single array of paragraphs
-    const translatedParagraphs = translatedBatches.flat();
-    
     // Join paragraphs back with double line breaks
+    const fullTranslation = translatedParagraphs.join('\n\n');
+    
     return { 
-      translatedText: translatedParagraphs.join('\n\n'),
-      provider: translatedParagraphs.length > 0 ? "deepl" : "none" 
+      translatedText: fullTranslation,
+      provider: 'batch'
     };
   } catch (error) {
     console.error("Translation error:", error);
@@ -147,6 +149,10 @@ export async function translateBySentences(request: TranslationRequest): Promise
   }
 }
 
+/**
+ * Main translation function that calls the backend API
+ * Backend handles all caching logic
+ */
 export async function translateText(request: TranslationRequest): Promise<TranslationResponse> {
   try {
     const response = await fetch('/api/translate', {
@@ -164,7 +170,8 @@ export async function translateText(request: TranslationRequest): Promise<Transl
       throw new Error(`Translation API error: ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    return result;
   } catch (error) {
     console.error("Translation error:", error);
     
@@ -176,3 +183,73 @@ export async function translateText(request: TranslationRequest): Promise<Transl
     };
   }
 }
+
+/**
+ * Backend cache management utilities
+ * These functions interact with the server-side cache API
+ */
+export const cacheUtils = {
+  /**
+   * Get cache statistics from backend
+   */
+  getStats: async () => {
+    try {
+      const response = await fetch(`${window.location.origin}/api/cache?action=stats`);
+      const result = await response.json();
+      return result.success ? result.data : { size: 0, hitRate: 0 };
+    } catch (error) {
+      console.error('Failed to get cache stats:', error);
+      return { size: 0, hitRate: 0 };
+    }
+  },
+  
+  /**
+   * Clear the backend translation cache
+   */
+  clearCache: async () => {
+    try {
+      const response = await fetch(`${window.location.origin}/api/cache?action=clear`);
+      const result = await response.json();
+      if (result.success) {
+        console.log('Backend cache cleared successfully');
+      }
+      return result.success;
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Pre-populate backend cache with common phrases for a language
+   */
+  preloadCommonPhrases: async (targetLanguage: string) => {
+    console.log(`Requesting preload for ${targetLanguage}...`);
+    
+    try {
+      const response = await fetch(`${window.location.origin}/api/cache`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'preload',
+          targetLanguage: targetLanguage
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`Backend preload started for ${targetLanguage}`);
+      } else {
+        console.warn(`Failed to start preload for ${targetLanguage}:`, result.error);
+      }
+      
+      return result.success;
+    } catch (error) {
+      console.error('Failed to request preload:', error);
+      return false;
+    }
+  }
+};
