@@ -210,9 +210,6 @@ export const cacheUtils = {
     try {
       const response = await fetch(`${window.location.origin}/api/cache?action=clear`);
       const result = await response.json();
-      if (result.success) {
-        console.log('Backend cache cleared successfully');
-      }
       return result.success;
     } catch (error) {
       console.error('Failed to clear cache:', error);
@@ -224,8 +221,6 @@ export const cacheUtils = {
    * Pre-populate backend cache with common phrases for a language
    */
   preloadCommonPhrases: async (targetLanguage: string) => {
-    console.log(`Requesting preload for ${targetLanguage}...`);
-    
     try {
       const response = await fetch(`${window.location.origin}/api/cache`, {
         method: 'POST',
@@ -239,13 +234,6 @@ export const cacheUtils = {
       });
       
       const result = await response.json();
-      
-      if (result.success) {
-        console.log(`Backend preload started for ${targetLanguage}`);
-      } else {
-        console.warn(`Failed to start preload for ${targetLanguage}:`, result.error);
-      }
-      
       return result.success;
     } catch (error) {
       console.error('Failed to request preload:', error);

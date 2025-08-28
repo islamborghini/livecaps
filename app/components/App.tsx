@@ -19,7 +19,7 @@
  */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   LiveConnectionState,
   LiveTranscriptionEvent,
@@ -58,7 +58,53 @@ const App: () => JSX.Element = () => {
   const processedFinalTexts = useRef<Set<string>>(new Set());
   const currentSentenceBuffer = useRef<string>("");
   const lastProcessedLength = useRef<number>(0);
+  const currentSentenceCount = useRef<number>(0); // Track current sentence count reliably
   const currentLanguageRef = useRef<string>(selectedLanguage.code); // Track current language
+  const bufferTimeout = useRef<NodeJS.Timeout | null>(null); // Timeout for processing buffered text
+  
+  // Translation queue management
+  const translationQueue = useRef<{
+    sentences: string[];
+    language: string;
+    index: number;
+  }[]>([]);
+  const isProcessingTranslation = useRef<boolean>(false);
+  
+  // Clear all transcription and translation data
+  const clearAllData = () => {
+    setCompleteSentences([]);
+    setTranslatedSentences([]);
+    setCurrentInterimText("");
+    currentSentenceBuffer.current = "";
+    currentSentenceCount.current = 0;
+    processedFinalTexts.current.clear();
+    translationQueue.current = [];
+    isProcessingTranslation.current = false;
+    
+    // Clear any pending timeouts
+    if (bufferTimeout.current) {
+      clearTimeout(bufferTimeout.current);
+      bufferTimeout.current = null;
+    }
+  };
+
+  // Process buffered text after a delay (fallback for incomplete sentences)
+  const processBufferedText = () => {
+    if (currentSentenceBuffer.current.trim().length > 10) { // Only if substantial content
+      const bufferedText = currentSentenceBuffer.current.trim();
+      
+      // Add as a sentence even if it doesn't meet strict criteria
+      // This helps capture incomplete but meaningful segments
+      const startingIndex = currentSentenceCount.current;
+      currentSentenceCount.current += 1;
+      
+      setCompleteSentences(prev => [...prev, bufferedText + "."]);
+      setTranslatedSentences(prev => [...prev, "Translating..."]);
+      queueTranslation([bufferedText + "."], currentLanguageRef.current, startingIndex);
+      
+      currentSentenceBuffer.current = "";
+    }
+  };
   
   useEffect(() => {
     setupMicrophone();
@@ -80,7 +126,13 @@ const App: () => JSX.Element = () => {
 
   // Update the current language ref whenever selectedLanguage changes
   useEffect(() => {
+    const oldLanguage = currentLanguageRef.current;
     currentLanguageRef.current = selectedLanguage.code;
+    
+    // If language changed, clear everything and start fresh
+    if (oldLanguage !== selectedLanguage.code) {
+      clearAllData();
+    }
     
     // Preload common phrases for the new language in the background using backend cache
     if (selectedLanguage.code !== 'en') {
@@ -90,34 +142,54 @@ const App: () => JSX.Element = () => {
     }
   }, [selectedLanguage.code]);
 
-  // Helper function to detect complete sentences
+  // More robust sentence detection that handles incomplete transcriptions
   const detectCompleteSentences = (text: string): string[] => {
     if (!text.trim()) return [];
     
-    // Split by sentence-ending punctuation, keeping the punctuation
-    const sentences = text.split(/([.!?]+)/).filter(Boolean);
-    const completeSentences: string[] = [];
+    // Use a more sophisticated approach for sentence detection
+    // that's better suited for real-time transcription
+    const sentences: string[] = [];
     
-    for (let i = 0; i < sentences.length; i += 2) {
-      const sentence = sentences[i];
-      const punctuation = sentences[i + 1];
+    // Split on strong sentence boundaries (.!?)
+    // But be more careful about what we consider complete
+    const potentialSentences = text.split(/([.!?]+\s+)/g).filter(s => s.trim());
+    
+    let currentSentence = '';
+    
+    for (let i = 0; i < potentialSentences.length; i++) {
+      const part = potentialSentences[i].trim();
       
-      if (sentence && punctuation) {
-        const fullSentence = (sentence + punctuation).trim();
-        if (fullSentence.length > 0) {
-          completeSentences.push(fullSentence);
+      if (!part) continue;
+      
+      currentSentence += part + ' ';
+      
+      // Check if this part ends with sentence punctuation
+      if (part.match(/[.!?]+$/)) {
+        const trimmedSentence = currentSentence.trim();
+        
+        // Only accept as complete if it meets quality criteria:
+        // 1. Has substantial length
+        // 2. Contains at least one word with 2+ characters
+        // 3. Doesn't start with obvious continuation words
+        // 4. Has proper sentence structure
+        if (trimmedSentence.length > 5 && 
+            trimmedSentence.match(/\b\w{2,}\b/) && // At least one substantial word
+            !trimmedSentence.match(/^(and|but|or|so|then|also|however|therefore|because|since|after|before|when|while|if|unless|although|though)\s/i) &&
+            !trimmedSentence.match(/^[a-z]/) && // Should start with capital letter
+            trimmedSentence.split(' ').length >= 2) { // At least 2 words
+          
+          sentences.push(trimmedSentence);
+          currentSentence = '';
         }
       }
     }
     
-    return completeSentences;
+    return sentences;
   };
 
-  // Enhanced translation function with context
+  // Enhanced translation function with context - now completely asynchronous
   const translateSentencesWithContext = async (sentences: string[], targetLanguage: string) => {
     if (sentences.length === 0) return [];
-    
-    setIsTranslating(true);
     
     try {
       // For context, include the last 2 sentences (if available) plus the new sentences
@@ -144,9 +216,91 @@ const App: () => JSX.Element = () => {
     } catch (error) {
       console.error("Translation error:", error);
       return sentences.map(() => "Translation failed");
+    }
+  };
+
+  // Non-blocking translation queue processor
+  const processTranslationQueue = async () => {
+    if (isProcessingTranslation.current || translationQueue.current.length === 0) {
+      return;
+    }
+
+    isProcessingTranslation.current = true;
+    setIsTranslating(true);
+
+    try {
+      while (translationQueue.current.length > 0) {
+        const item = translationQueue.current.shift();
+        if (!item) break;
+        
+        const translations = await translateSentencesWithContext(item.sentences, item.language);
+        
+        // Update translated sentences - use functional update to avoid race conditions
+        setTranslatedSentences(prev => {
+          const newTranslatedSentences = [...prev];
+          
+          // Ensure we have enough slots
+          while (newTranslatedSentences.length < item.index + translations.length) {
+            newTranslatedSentences.push("Translating...");
+          }
+          
+          // Insert translations at the correct position
+          for (let i = 0; i < translations.length; i++) {
+            newTranslatedSentences[item.index + i] = translations[i];
+          }
+          
+          return newTranslatedSentences;
+        });
+
+        // Small delay to prevent overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    } catch (error) {
+      console.error("Translation queue processing error:", error);
     } finally {
+      isProcessingTranslation.current = false;
       setIsTranslating(false);
     }
+  };
+
+  // Add translation to queue (non-blocking)
+  const queueTranslation = (sentences: string[], targetLanguage: string, startIndex: number) => {
+    // Create a unique key for this translation request
+    const requestKey = `${startIndex}-${sentences.length}-${sentences.join('|').substring(0, 50)}`;
+    
+    // Check if we already have a translation request for this exact content
+    const existingRequest = translationQueue.current.find(item => {
+      const existingKey = `${item.index}-${item.sentences.length}-${item.sentences.join('|').substring(0, 50)}`;
+      return existingKey === requestKey;
+    });
+    
+    if (existingRequest) {
+      return;
+    }
+
+    // Also check if these sentences are already translated (not just "Translating...")
+    let alreadyTranslated = true;
+    for (let i = 0; i < sentences.length; i++) {
+      const translationIndex = startIndex + i;
+      const currentTranslation = translatedSentences[translationIndex];
+      if (!currentTranslation || currentTranslation === "" || currentTranslation === "Translating...") {
+        alreadyTranslated = false;
+        break;
+      }
+    }
+    
+    if (alreadyTranslated) {
+      return;
+    }
+
+    translationQueue.current.push({
+      sentences,
+      language: targetLanguage,
+      index: startIndex
+    });
+
+    // Start processing queue asynchronously (fire and forget)
+    setTimeout(() => processTranslationQueue(), 0);
   };
 
   useEffect(() => {
@@ -175,26 +329,55 @@ const App: () => JSX.Element = () => {
         
         processedFinalTexts.current.add(thisCaption);
         
-        // Add the buffer content + new final text
-        const fullText = currentSentenceBuffer.current + " " + thisCaption;
-        const sentences = detectCompleteSentences(fullText.trim());
+        // Combine buffer with new text
+        const textToProcess = (currentSentenceBuffer.current + " " + thisCaption).trim();
         
-        if (sentences.length > 0) {
-          // Add new complete sentences
-          const newSentences = [...sentences];
-          setCompleteSentences(prev => [...prev, ...newSentences]);
+        // Wait for a longer pause or multiple sentences before processing
+        // This helps ensure we have complete context
+        const newCompleteSentences = detectCompleteSentences(textToProcess);
+        
+        if (newCompleteSentences.length > 0) {
+          // Clear any pending buffer timeout since we found complete sentences
+          if (bufferTimeout.current) {
+            clearTimeout(bufferTimeout.current);
+            bufferTimeout.current = null;
+          }
           
-          // Translate the new sentences with context using current language
-          translateSentencesWithContext(newSentences, currentLanguageRef.current)
-            .then(translations => {
-              setTranslatedSentences(prev => [...prev, ...translations]);
-            });
+          // Calculate what text remains after extracting complete sentences
+          const extractedText = newCompleteSentences.join(' ');
+          const remainingText = textToProcess.slice(extractedText.length).trim();
           
-          // Clear the buffer as we've processed complete sentences
-          currentSentenceBuffer.current = "";
+          // Update the sentence count ref immediately
+          const startingIndex = currentSentenceCount.current;
+          currentSentenceCount.current += newCompleteSentences.length;
+          
+          // Add all detected sentences to the state
+          setCompleteSentences(prev => [...prev, ...newCompleteSentences]);
+          
+          // Add "Translating..." placeholders for the new sentences
+          setTranslatedSentences(prev => {
+            const newPlaceholders = new Array(newCompleteSentences.length).fill("Translating...");
+            return [...prev, ...newPlaceholders];
+          });
+          
+          // Queue translation for the new sentences
+          queueTranslation(newCompleteSentences, currentLanguageRef.current, startingIndex);
+          
+          // Keep any remaining text in buffer
+          currentSentenceBuffer.current = remainingText;
         } else {
-          // No complete sentences, keep in buffer
-          currentSentenceBuffer.current = fullText;
+          // No complete sentences detected, keep building in buffer
+          currentSentenceBuffer.current = textToProcess;
+          
+          // Set a timeout to process buffered text if no new transcription comes
+          // This helps capture incomplete but meaningful segments
+          if (bufferTimeout.current) {
+            clearTimeout(bufferTimeout.current);
+          }
+          
+          bufferTimeout.current = setTimeout(() => {
+            processBufferedText();
+          }, 3000); // Wait 3 seconds before processing buffered text
         }
         
         // Clear interim display
