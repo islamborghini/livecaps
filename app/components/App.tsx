@@ -117,6 +117,7 @@ const App: () => JSX.Element = () => {
         interim_results: true,
         smart_format: true,
         filler_words: true,
+        punctuate: true, // Enable Deepgram's built-in punctuation for better sentence detection
         utterance_end_ms: 1500, // Detect pauses after 1.5 seconds for better sentence detection
       });
     }
