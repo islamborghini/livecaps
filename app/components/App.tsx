@@ -122,6 +122,7 @@ const App: () => JSX.Element = () => {
         filler_words: true,
         punctuate: true, // Enable Deepgram's built-in punctuation for better sentence detection
         utterance_end_ms: 1500, // Detect pauses after 1.5 seconds for better sentence detection
+        vad_events: true, // Enable Voice Activity Detection to process buffer on natural pauses
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -411,8 +412,30 @@ const App: () => JSX.Element = () => {
       }
     };
 
+    // Handler for when Deepgram detects the speaker has paused/stopped talking
+    const onUtteranceEnd = () => {
+      console.log('🎤 Speaker pause detected, processing buffer immediately...');
+
+      // If there's text in the buffer, process it immediately
+      if (currentSentenceBuffer.current.trim().length > 0) {
+        console.log(`📝 Buffer content: "${currentSentenceBuffer.current.trim()}"`);
+
+        // Clear any pending timeout since we're processing now
+        if (bufferTimeout.current) {
+          clearTimeout(bufferTimeout.current);
+          bufferTimeout.current = null;
+        }
+
+        // Process the buffered text immediately
+        processBufferedText();
+      } else {
+        console.log('📭 Buffer empty, nothing to process');
+      }
+    };
+
     if (connectionState === LiveConnectionState.OPEN) {
       connection.addListener(LiveTranscriptionEvents.Transcript, onTranscript);
+      connection.addListener(LiveTranscriptionEvents.UtteranceEnd, onUtteranceEnd);
       microphone.addEventListener(MicrophoneEvents.DataAvailable, onData);
 
       // Only start microphone if it's not already recording
@@ -423,6 +446,7 @@ const App: () => JSX.Element = () => {
 
     return () => {
       connection.removeListener(LiveTranscriptionEvents.Transcript, onTranscript);
+      connection.removeListener(LiveTranscriptionEvents.UtteranceEnd, onUtteranceEnd);
       microphone.removeEventListener(MicrophoneEvents.DataAvailable, onData);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
