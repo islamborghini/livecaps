@@ -6,8 +6,21 @@ export const revalidate = 0;
 export async function GET(request: NextRequest) {
   // Development fallback using environment variable
   if (process.env.DEEPGRAM_ENV === "development") {
+    const apiKey = process.env.DEEPGRAM_API_KEY;
+
+    if (!apiKey || apiKey.trim() === '') {
+      console.error('❌ DEEPGRAM_API_KEY is not set in environment variables');
+      return NextResponse.json({
+        error: 'DEEPGRAM_API_KEY is not configured',
+        message: 'Please add your Deepgram API key to the .env.local file'
+      }, { status: 500 });
+    }
+
+    console.log('✅ Using development API key from environment');
+    console.log('API key prefix:', apiKey.substring(0, 10) + '...');
+    console.log('API key length:', apiKey.length);
     return NextResponse.json({
-      key: process.env.DEEPGRAM_API_KEY ?? "",
+      key: apiKey,
     });
   }
 

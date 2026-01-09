@@ -49,9 +49,28 @@ interface DeepgramContextProviderProps {
 }
 
 const getApiKey = async (): Promise<string> => {
-  const response = await fetch("/api/authenticate", { cache: "no-store" });
-  const result = await response.json();
-  return result.key;
+  try {
+    const response = await fetch("/api/authenticate", { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error(`Authentication API returned ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.message || result.error);
+    }
+
+    if (!result.key) {
+      throw new Error('No API key received from authentication endpoint');
+    }
+
+    return result.key;
+  } catch (error) {
+    console.error('❌ Failed to get API key:', error);
+    throw error;
+  }
 };
 
 const DeepgramContextProvider: FunctionComponent<
@@ -70,20 +89,59 @@ const DeepgramContextProvider: FunctionComponent<
    * @returns A Promise that resolves when the connection is established.
    */
   const connectToDeepgram = async (options: LiveSchema, endpoint?: string) => {
-    const key = await getApiKey();
-    const deepgram = createClient(key);
+    try {
+      console.log('🔄 Requesting Deepgram API key...');
+      const key = await getApiKey();
 
-    const conn = deepgram.listen.live(options, endpoint);
+      if (!key || key === 'build-time-placeholder') {
+        console.error('❌ Invalid Deepgram API key received');
+        setConnectionState(LiveConnectionState.CLOSED);
+        return;
+      }
 
-    conn.addListener(LiveTranscriptionEvents.Open, () => {
-      setConnectionState(LiveConnectionState.OPEN);
-    });
+      console.log('✅ API key received, length:', key.length);
+      console.log('🔄 Creating Deepgram client...');
+      const deepgram = createClient(key);
 
-    conn.addListener(LiveTranscriptionEvents.Close, () => {
+      console.log('🔄 Attempting to establish WebSocket connection with options:', options);
+      const conn = deepgram.listen.live(options, endpoint);
+
+      conn.addListener(LiveTranscriptionEvents.Open, () => {
+        console.log('✅ Deepgram WebSocket connection opened successfully!');
+        setConnectionState(LiveConnectionState.OPEN);
+      });
+
+      conn.addListener(LiveTranscriptionEvents.Close, (event: any) => {
+        console.log('❌ Deepgram WebSocket connection closed');
+        console.log('Close event details:', event);
+        setConnectionState(LiveConnectionState.CLOSED);
+      });
+
+      conn.addListener(LiveTranscriptionEvents.Error, (error: any) => {
+        console.error('❌ Deepgram WebSocket error details:');
+        console.error('Error type:', typeof error);
+        console.error('Error object:', error);
+        if (error?.message) {
+          console.error('Error message:', error.message);
+        }
+        if (error?.code) {
+          console.error('Error code:', error.code);
+        }
+        setConnectionState(LiveConnectionState.CLOSED);
+      });
+
+      console.log('✅ WebSocket listeners configured, setting connection...');
+      setConnection(conn);
+    } catch (error) {
+      console.error('❌ Failed to connect to Deepgram:');
+      console.error('Error type:', typeof error);
+      console.error('Error details:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       setConnectionState(LiveConnectionState.CLOSED);
-    });
-
-    setConnection(conn);
+    }
   };
 
   const disconnectFromDeepgram = async () => {
