@@ -36,6 +36,9 @@ import LanguageSelector, { Language, languages } from "./LanguageSelector";
 import { detectSentences, processSentencesForTranslation, translateBySentences, cacheUtils } from "../services/translationService";
 
 const App: () => JSX.Element = () => {
+  // Translation batching configuration - process up to 3 sentences at once for better performance
+  const BATCH_SIZE = 3;
+
   // State management for sentence-based transcription and translation
   const [completeSentences, setCompleteSentences] = useState<string[]>([]);
   const [translatedSentences, setTranslatedSentences] = useState<string[]>([]);
@@ -219,7 +222,7 @@ const App: () => JSX.Element = () => {
     }
   };
 
-  // Non-blocking translation queue processor
+  // Non-blocking translation queue processor with batching
   const processTranslationQueue = async () => {
     if (isProcessingTranslation.current || translationQueue.current.length === 0) {
       return;
@@ -229,30 +232,51 @@ const App: () => JSX.Element = () => {
 
     try {
       while (translationQueue.current.length > 0) {
-        const item = translationQueue.current.shift();
-        if (!item) break;
-        
-        const translations = await translateSentencesWithContext(item.sentences, item.language);
-        
-        // Update translated sentences - use functional update to avoid race conditions
+        // Take multiple items from queue (up to BATCH_SIZE)
+        const batchSize = Math.min(BATCH_SIZE, translationQueue.current.length);
+        const batch = translationQueue.current.splice(0, batchSize);
+
+        if (batch.length === 0) break;
+
+        // Check if all items in batch are for the same language
+        const language = batch[0].language;
+        const sameLanguage = batch.every(item => item.language === language);
+
+        if (!sameLanguage) {
+          // If different languages detected, put extras back and process first item only
+          console.log('⚠️ Language mismatch in batch, processing separately');
+          translationQueue.current.unshift(...batch.slice(1));
+          batch.length = 1;
+        }
+
+        // Combine all sentences from the batch
+        const allSentences = batch.flatMap(item => item.sentences);
+        const startIndex = batch[0].index;
+
+        console.log(`🔄 Batch translating ${allSentences.length} sentence(s) to ${language}`);
+
+        // ONE API call for all sentences in the batch
+        const translations = await translateSentencesWithContext(allSentences, language);
+
+        // Update all translated sentences at once - use functional update to avoid race conditions
         setTranslatedSentences(prev => {
           const newTranslatedSentences = [...prev];
-          
+
           // Ensure we have enough slots
-          while (newTranslatedSentences.length < item.index + translations.length) {
+          while (newTranslatedSentences.length < startIndex + translations.length) {
             newTranslatedSentences.push("");
           }
-          
-          // Insert translations at the correct position
-          for (let i = 0; i < translations.length; i++) {
-            newTranslatedSentences[item.index + i] = translations[i];
-          }
-          
+
+          // Insert all translations at the correct positions
+          translations.forEach((translation, i) => {
+            newTranslatedSentences[startIndex + i] = translation;
+          });
+
           return newTranslatedSentences;
         });
 
-        // Small delay to prevent overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Slightly longer delay after batch since we processed more
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       console.error("Translation queue processing error:", error);
