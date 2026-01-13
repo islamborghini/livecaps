@@ -17,6 +17,7 @@ import classNames from "classnames";
 import localFont from "next/font/local";
 
 import { DeepgramContextProvider } from "./context/DeepgramContextProvider";
+import { MultiDeepgramContextProvider } from "./context/MultiDeepgramContextProvider";
 import { MicrophoneContextProvider } from "./context/MicrophoneContextProvider";
 import { DarkModeContextProvider } from "./context/DarkModeContextProvider";
 
@@ -62,7 +63,11 @@ export default function RootLayout({
       >
         <DarkModeContextProvider>
           <MicrophoneContextProvider>
-            <DeepgramContextProvider>{children}</DeepgramContextProvider>
+            <DeepgramContextProvider>
+              <MultiDeepgramContextProvider>
+                {children}
+              </MultiDeepgramContextProvider>
+            </DeepgramContextProvider>
           </MicrophoneContextProvider>
         </DarkModeContextProvider>
       </body>
