@@ -208,23 +208,84 @@ const App: () => JSX.Element = () => {
 
   // Process buffered text after a delay (fallback for incomplete sentences)
   // Now creates a TranscriptBlock for unified transcript view
+  // Improved: requires more content before flushing to avoid fragmented sentences
   const processBufferedText = () => {
-    if (currentSentenceBuffer.current.text.trim().length > 10) { // Only if substantial content
-      const bufferedText = currentSentenceBuffer.current.text.trim();
+    const bufferedText = currentSentenceBuffer.current.text.trim();
+    
+    // Require at least 60 characters to avoid tiny fragments
+    // This ensures we have substantial, meaningful content
+    if (bufferedText.length >= 60) {
       const bufferedLanguages = currentSentenceBuffer.current.languages;
 
-      // Create a transcript block with the buffered text
-      const block = createTranscriptBlock(bufferedText + ".", bufferedLanguages);
+      // Try to find a natural break point to avoid cutting mid-thought
+      // Look for sentence-ending punctuation first
+      let textToProcess = bufferedText;
+      let remainingText = "";
+      
+      // First, try to find a sentence boundary (. ! ?)
+      // Look for punctuation followed by space and capital/uppercase letter
+      // Using simpler regex that works across all ES targets
+      const sentenceEndIndex = bufferedText.search(/[.!?]\s+[A-ZА-ЯЁ\u4e00-\u9fff\uac00-\ud7af]/);
+      
+      if (sentenceEndIndex !== -1) {
+        // Found a clean sentence boundary - include the punctuation
+        const splitPoint = sentenceEndIndex + 1;
+        textToProcess = bufferedText.substring(0, splitPoint).trim();
+        remainingText = bufferedText.substring(splitPoint).trim();
+      } else {
+        // No sentence boundary - look for clause breaks in last 30% of text
+        const breakSearchStart = Math.floor(bufferedText.length * 0.7);
+        const endPortion = bufferedText.substring(breakSearchStart);
+        
+        // Find break points: comma, semicolon, dash, or conjunctions
+        const breakMatch = endPortion.match(/[,;–—]\s+|(?:\s+(?:and|or|but|that|which|who|и|или|а|но|что|который|которая)\s+)/i);
+        
+        if (breakMatch && breakMatch.index !== undefined) {
+          // Keep text up to and including the break point
+          const breakIndex = breakSearchStart + breakMatch.index + breakMatch[0].length;
+          textToProcess = bufferedText.substring(0, breakIndex).trim();
+          remainingText = bufferedText.substring(breakIndex).trim();
+        }
+        // If no break found, use all text (will be processed on next flush)
+      }
 
-      // Add block to transcript
-      setTranscriptBlocks(prev => [...prev, block]);
+      // Keep remaining text in buffer for next segment
+      if (remainingText.length > 0) {
+        currentSentenceBuffer.current = { text: remainingText, languages: bufferedLanguages };
+      } else {
+        currentSentenceBuffer.current = { text: "", languages: [] };
+      }
 
-      // Queue translations for all display languages
-      sessionLanguages.display.forEach(targetLang => {
-        queueTranslation(block.id, block.original.text, targetLang);
-      });
+      // Add period if text doesn't end with punctuation
+      if (!/[.!?]$/.test(textToProcess)) {
+        textToProcess += ".";
+      }
 
-      currentSentenceBuffer.current = { text: "", languages: [] };
+      // Only create block if we have meaningful content (at least 4 words)
+      // Word pattern covers Latin, Cyrillic, Korean, Chinese/Japanese
+      const wordPattern = /[A-Za-zА-Яа-яЁё\u4e00-\u9fff\uac00-\ud7af]+/g;
+      const wordCount = (textToProcess.match(wordPattern) || []).length;
+      if (wordCount >= 4) {
+        // Create a transcript block with the processed text
+        const block = createTranscriptBlock(textToProcess, bufferedLanguages);
+
+        // Add block to transcript
+        setTranscriptBlocks(prev => [...prev, block]);
+
+        // Queue translations for all display languages
+        sessionLanguages.display.forEach(targetLang => {
+          queueTranslation(block.id, block.original.text, targetLang);
+        });
+
+        console.log(`📦 Flushed buffer (${textToProcess.length} chars, ${wordCount} words): "${textToProcess.substring(0, 50)}..."`);
+      } else {
+        // Not enough content, put it back in buffer
+        currentSentenceBuffer.current = { 
+          text: textToProcess.replace(/\.$/, '') + " " + remainingText, 
+          languages: bufferedLanguages 
+        };
+        console.log(`⏳ Buffer too short (${wordCount} words), continuing to accumulate...`);
+      }
     }
   };
   
@@ -284,8 +345,8 @@ const App: () => JSX.Element = () => {
             interim_results: true,
             smart_format: true,
             punctuate: true,
-            endpointing: 100,
-            utterance_end_ms: 1500,
+            endpointing: 300,
+            utterance_end_ms: 2500,
             vad_events: true,
           };
 
@@ -415,8 +476,8 @@ const App: () => JSX.Element = () => {
           interim_results: true,
           smart_format: true,
           punctuate: true,
-          endpointing: 100,
-          utterance_end_ms: 1500,
+          endpointing: 300,
+          utterance_end_ms: 2500,
           vad_events: true,
         };
 
@@ -488,8 +549,8 @@ const App: () => JSX.Element = () => {
           interim_results: true,
           smart_format: true,
           punctuate: true,
-          endpointing: 100,
-          utterance_end_ms: 1500,
+          endpointing: 300,
+          utterance_end_ms: 2500,
           vad_events: true,
         };
 
@@ -506,43 +567,39 @@ const App: () => JSX.Element = () => {
   };
 
   // More robust sentence detection that handles incomplete transcriptions
+  // Improved: Accumulates longer segments and uses smarter boundary detection
   const detectCompleteSentences = (text: string): string[] => {
     if (!text.trim()) return [];
     
-    // Use a more sophisticated approach for sentence detection
-    // that's better suited for real-time transcription
     const sentences: string[] = [];
     
-    // Split on strong sentence boundaries (.!?)
-    // But be more careful about what we consider complete
-    const potentialSentences = text.split(/([.!?]+\s+)/g).filter(s => s.trim());
+    // Only process if we have substantial content (at least 40 chars)
+    // This prevents premature splitting of short fragments
+    if (text.length < 40) {
+      return [];
+    }
     
-    let currentSentence = '';
+    // Match sentences ending with . ! ? followed by space and uppercase
+    // Uses explicit character ranges for compatibility
+    // Covers: Latin, Cyrillic, Korean Hangul, Chinese/Japanese
+    const sentenceRegex = /[^.!?]+[.!?]+(?=\s+[A-ZА-ЯЁ\u4e00-\u9fff\uac00-\ud7af]|$)/g;
+    const matches = text.match(sentenceRegex);
     
-    for (let i = 0; i < potentialSentences.length; i++) {
-      const part = potentialSentences[i].trim();
-      
-      if (!part) continue;
-      
-      currentSentence += part + ' ';
-      
-      // Check if this part ends with sentence punctuation
-      if (part.match(/[.!?]+$/)) {
-        const trimmedSentence = currentSentence.trim();
+    if (matches) {
+      for (const match of matches) {
+        const trimmed = match.trim();
         
-        // Only accept as complete if it meets quality criteria:
-        // 1. Has substantial length
-        // 2. Contains at least one word with 2+ characters
-        // 3. Doesn't start with obvious continuation words
-        // 4. Has proper sentence structure
-        if (trimmedSentence.length > 5 && 
-            trimmedSentence.match(/\b\w{2,}\b/) && // At least one substantial word
-            !trimmedSentence.match(/^(and|but|or|so|then|also|however|therefore|because|since|after|before|when|while|if|unless|although|though)\s/i) &&
-            !trimmedSentence.match(/^[a-z]/) && // Should start with capital letter
-            trimmedSentence.split(' ').length >= 2) { // At least 2 words
-          
-          sentences.push(trimmedSentence);
-          currentSentence = '';
+        // Accept sentence if it meets quality criteria:
+        // 1. At least 40 characters (ensures meaningful content)
+        // 2. Contains at least 4 word-like sequences (any script)
+        // 3. Doesn't look like a fragment (doesn't start with lowercase)
+        // Word pattern covers Latin, Cyrillic, Korean, Chinese/Japanese
+        const wordPattern = /[A-Za-zА-Яа-яЁё\u4e00-\u9fff\uac00-\ud7af]+/g;
+        const wordCount = (trimmed.match(wordPattern) || []).length;
+        const startsWithLowercase = /^[a-zа-яё]/.test(trimmed);
+        
+        if (trimmed.length >= 40 && wordCount >= 4 && !startsWithLowercase) {
+          sentences.push(trimmed);
         }
       }
     }
@@ -694,17 +751,25 @@ const App: () => JSX.Element = () => {
         languages: combinedLanguages
       };
 
-      // Set timeout to process buffer after 3 seconds
+      // Set timeout to process buffer - longer timeout for better accumulation
       if (bufferTimeout.current) {
         clearTimeout(bufferTimeout.current);
       }
 
       bufferTimeout.current = setTimeout(() => {
-        if (currentSentenceBuffer.current.text.trim().length > 10) {
-          const bufferedText = currentSentenceBuffer.current.text.trim();
+        // Only flush if we have substantial content (60+ chars, 4+ words)
+        const bufferedText = currentSentenceBuffer.current.text.trim();
+        // Word pattern covers Latin, Cyrillic, Korean, Chinese/Japanese
+        const wordPattern = /[A-Za-zА-Яа-яЁё\u4e00-\u9fff\uac00-\ud7af]+/g;
+        const wordCount = (bufferedText.match(wordPattern) || []).length;
+        
+        if (bufferedText.length >= 60 && wordCount >= 4) {
           const bufferedLanguages = currentSentenceBuffer.current.languages;
 
-          const block = createTranscriptBlock(bufferedText + ".", bufferedLanguages);
+          // Add period if needed
+          const finalText = /[.!?]$/.test(bufferedText) ? bufferedText : bufferedText + ".";
+          
+          const block = createTranscriptBlock(finalText, bufferedLanguages);
           setTranscriptBlocks(prev => [...prev, block]);
 
           sessionLanguages.display.forEach(targetLang => {
@@ -712,8 +777,11 @@ const App: () => JSX.Element = () => {
           });
 
           currentSentenceBuffer.current = { text: "", languages: [] };
+          console.log(`📦 Timeout flush (${finalText.length} chars, ${wordCount} words)`);
+        } else if (bufferedText.length > 0) {
+          console.log(`⏳ Timeout: buffer too short (${bufferedText.length} chars, ${wordCount} words), keeping...`);
         }
-      }, 3000);
+      }, 3500); // Longer timeout for better accumulation
     }
 
     // Clear interim text
@@ -880,14 +948,14 @@ const App: () => JSX.Element = () => {
           currentSentenceBuffer.current = { text: textToProcess, languages: combinedLanguages };
           
           // Set a timeout to process buffered text if no new transcription comes
-          // This helps capture incomplete but meaningful segments
+          // Longer timeout allows more content to accumulate
           if (bufferTimeout.current) {
             clearTimeout(bufferTimeout.current);
           }
           
           bufferTimeout.current = setTimeout(() => {
             processBufferedText();
-          }, 3000); // Wait 3 seconds before processing buffered text
+          }, 3500); // Longer timeout for better accumulation
         }
         
         // Clear interim display
@@ -900,15 +968,20 @@ const App: () => JSX.Element = () => {
     };
 
     // Handler for when Deepgram detects the speaker has paused/stopped talking
+    // Improved: Only process if we have substantial content, otherwise wait for more
     const onUtteranceEnd = () => {
-      console.log('🎤 Speaker pause detected, processing buffer immediately...');
+      console.log('🎤 Speaker pause detected...');
 
-      // If there's text in the buffer, process it immediately
-      if (currentSentenceBuffer.current.text.trim().length > 0) {
+      const bufferLength = currentSentenceBuffer.current.text.trim().length;
+      
+      // Only process immediately if we have substantial content (80+ chars)
+      // Otherwise, let the regular buffer timeout handle it
+      // This prevents flushing tiny fragments on brief pauses
+      if (bufferLength >= 80) {
         const langInfo = currentSentenceBuffer.current.languages.length > 0 
           ? ` [${currentSentenceBuffer.current.languages.join(', ')}]` 
           : '';
-        console.log(`📝 Buffer content${langInfo}: "${currentSentenceBuffer.current.text.trim()}"`);
+        console.log(`📝 Substantial buffer${langInfo} (${bufferLength} chars), processing...`);
 
         // Clear any pending timeout since we're processing now
         if (bufferTimeout.current) {
@@ -916,8 +989,12 @@ const App: () => JSX.Element = () => {
           bufferTimeout.current = null;
         }
 
-        // Process the buffered text immediately
+        // Process the buffered text
         processBufferedText();
+      } else if (bufferLength > 0) {
+        console.log(`⏳ Small buffer (${bufferLength} chars), waiting for more content...`);
+        // Don't flush yet - let the buffer continue accumulating
+        // The regular timeout will flush if no more audio comes
       } else {
         console.log('📭 Buffer empty, nothing to process');
       }

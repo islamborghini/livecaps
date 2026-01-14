@@ -179,8 +179,8 @@ export function MultiDeepgramContextProvider({
         interim_results: true,
         smart_format: true,
         punctuate: true,
-        endpointing: 100,
-        utterance_end_ms: 1500,
+        endpointing: 300,      // Increased from 100ms to prevent premature sentence breaks
+        utterance_end_ms: 2500, // Increased from 1500ms for longer continuous speech
         vad_events: true,
       };
 
@@ -307,6 +307,21 @@ export function MultiDeepgramContextProvider({
   };
 
   /**
+   * Handler for when a winner is selected
+   * NOTE: Defined before handleTranscriptFromConnection because it's used there
+   */
+  const handleWinnerSelected = useCallback((winner: WinnerTranscript) => {
+    console.log(
+      `🏆 Winner selected: [${winner.language}] confidence=${winner.confidence.toFixed(3)}`
+    );
+
+    // Notify all registered callbacks
+    winnerCallbacks.current.forEach((callback) => {
+      callback(winner);
+    });
+  }, []);
+
+  /**
    * Handles transcript event from a specific connection
    */
   const handleTranscriptFromConnection = useCallback(
@@ -362,25 +377,34 @@ export function MultiDeepgramContextProvider({
 
       // Add to buffer for comparison (only for final results)
       if (isFinal && transcriptBuffer.current) {
-        transcriptBuffer.current.addResult(result);
+        // OPTIMIZATION: Early winner exit for high-confidence results
+        // If confidence is very high, don't wait for other connections
+        if (confidence >= CONFIDENCE_CONFIG.HIGH_CONFIDENCE_EARLY_EXIT) {
+          console.log(`⚡ High confidence (${confidence.toFixed(3)}) - early winner exit for [${language}]`);
+          
+          // Create winner directly without waiting for buffer
+          const earlyWinner: WinnerTranscript = {
+            connectionId,
+            language,
+            transcript,
+            confidence,
+            timestamp: Date.now(),
+            isFinal: true,  // IMPORTANT: Mark as final so App.tsx processes it
+            isSignificantWin: true,
+            allResults: [result],
+          };
+          
+          // Clear buffer and emit winner immediately
+          transcriptBuffer.current.clear();
+          handleWinnerSelected(earlyWinner);
+        } else {
+          // Normal flow - add to buffer for comparison
+          transcriptBuffer.current.addResult(result);
+        }
       }
     },
-    []
+    [handleWinnerSelected]
   );
-
-  /**
-   * Handler for when a winner is selected
-   */
-  const handleWinnerSelected = useCallback((winner: WinnerTranscript) => {
-    console.log(
-      `🏆 Winner selected: [${winner.language}] confidence=${winner.confidence.toFixed(3)}`
-    );
-
-    // Notify all registered callbacks
-    winnerCallbacks.current.forEach((callback) => {
-      callback(winner);
-    });
-  }, []);
 
   /**
    * Connects to Deepgram with parallel connections for specified languages

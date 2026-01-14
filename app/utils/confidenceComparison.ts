@@ -17,7 +17,7 @@ import {
  */
 export const CONFIDENCE_CONFIG = {
   /** Time window to wait for all connections to respond (ms) */
-  BUFFER_WINDOW_MS: 50,
+  BUFFER_WINDOW_MS: 30,  // Reduced from 50ms for faster response
 
   /** Minimum confidence to consider a result valid */
   MIN_CONFIDENCE_THRESHOLD: 0.3,
@@ -26,7 +26,10 @@ export const CONFIDENCE_CONFIG = {
   SIGNIFICANT_DIFFERENCE_THRESHOLD: 0.05,
 
   /** Maximum time to wait before forcing a decision (ms) */
-  MAX_WAIT_TIME_MS: 100,
+  MAX_WAIT_TIME_MS: 80,  // Reduced from 100ms for faster response
+
+  /** High confidence threshold for early winner exit (skip waiting for other connections) */
+  HIGH_CONFIDENCE_EARLY_EXIT: 0.85,
 };
 
 /**
