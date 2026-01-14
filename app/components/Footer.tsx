@@ -10,13 +10,7 @@ const Footer = () => {
   return (
     <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 py-6 px-4 md:px-6 lg:px-8 transition-colors duration-200">
       <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="text-gray-600 dark:text-gray-400 text-sm text-center md:text-left">
-          <p>
-            Built with{" "}
-            <span className="text-blue-600 dark:text-blue-400 font-medium">Deepgram</span> and{" "}
-            <span className="text-green-600 dark:text-green-400 font-medium">DeepL</span>
-          </p>
-        </div>
+
         
         <div className="flex items-center gap-6">
           <a
@@ -40,8 +34,18 @@ const Footer = () => {
             <span>GitHub</span>
           </a>
           
-          <div className="text-gray-500 dark:text-gray-500 text-sm">
-            <span>LiveCaps v1.0</span>
+          <div className="h-6 border-l border-gray-300 dark:border-gray-600" />
+          <div className="text-white dark:text-gray-400 text-sm">
+            <span>© {new Date().getFullYear()} LiveCaps. </span>
+            <span className="pl-8">Contact: </span>
+            <a href="mailto:islam@uni.minerva.edu" className="underline">
+              islam@uni.minerva.edu
+            </a>
+          </div>
+
+          
+          <div className="pl-8 text-gray-500 dark:text-white text-sm">
+            <span>LiveCaps</span>
           </div>
         </div>
       </div>
