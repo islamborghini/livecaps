@@ -121,19 +121,11 @@ export default function TranscriptionModeToggle({
               only. More accurate for single language speech.
             </div>
           </div>
-        ) : (
-          <div className="flex items-start gap-2">
-            <span className="text-purple-600 dark:text-purple-400">🌐</span>
-            <div>
-              <strong>Multi-Language Detection:</strong> Automatically detects which
-              language is being spoken among{" "}
-              <span className="font-mono bg-purple-100 dark:bg-purple-900 px-1 rounded">
-                {spokenLanguages.join(", ")}
-              </span>
-              .
+          ) : (
+            <div className="flex items-start gap-2">
+              <span className="text-purple-600 dark:text-purple-400"></span>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       {/* Active Languages Badge */}
@@ -155,18 +147,6 @@ export default function TranscriptionModeToggle({
         </div>
       )}
 
-      {/* Quota Warning */}
-      {isMultiMode && spokenLanguages.length > 1 && (
-        <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <span className="text-yellow-600 dark:text-yellow-400">⚠️</span>
-          <div className="text-xs text-yellow-800 dark:text-yellow-200">
-            <strong>Quota Impact:</strong> Multi-language detection uses{" "}
-            <strong>{quotaMultiplier}x</strong> API quota (
-            {spokenLanguages.length} parallel connections). Your free tier will be
-            consumed {quotaMultiplier}x faster.
-          </div>
-        </div>
-      )}
 
       {/* Connection Warning */}
       {isConnected && (
