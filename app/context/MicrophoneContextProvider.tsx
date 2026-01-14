@@ -32,6 +32,8 @@ interface MicrophoneContextType {
   stopMicrophone: () => void;
   setupMicrophone: () => void;
   microphoneState: MicrophoneState | null;
+  errorMessage: string | null;
+  retrySetup: () => void;
 }
 
 export enum MicrophoneEvents {
@@ -69,11 +71,24 @@ const MicrophoneContextProvider: React.FC<MicrophoneContextProviderProps> = ({
     MicrophoneState.NotSetup
   );
   const [microphone, setMicrophone] = useState<MediaRecorder | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const setupMicrophone = async () => {
     setMicrophoneState(MicrophoneState.SettingUp);
+    setErrorMessage(null);
 
     try {
+      // Check if we're in a secure context (HTTPS or localhost)
+      if (!window.isSecureContext) {
+        throw new Error('Microphone access requires HTTPS or localhost');
+      }
+
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Your browser does not support microphone access');
+      }
+
+      console.log('🎤 Requesting microphone permission...');
       const userMedia = await navigator.mediaDevices.getUserMedia({
         audio: {
           noiseSuppression: true,
@@ -81,16 +96,67 @@ const MicrophoneContextProvider: React.FC<MicrophoneContextProviderProps> = ({
         },
       });
 
-      const microphone = new MediaRecorder(userMedia);
+      // Configure MediaRecorder with specific audio encoding that Deepgram supports
+      // Try webm/opus first (widely supported and works well with Deepgram)
+      let mimeType = 'audio/webm;codecs=opus';
+      let options: MediaRecorderOptions = { mimeType };
 
+      // Fallback to other formats if webm/opus not supported
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        console.warn(`${mimeType} not supported, trying alternatives...`);
+
+        const alternatives = [
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+          'audio/mp4',
+        ];
+
+        for (const alt of alternatives) {
+          if (MediaRecorder.isTypeSupported(alt)) {
+            mimeType = alt;
+            options = { mimeType: alt };
+            console.log(`Using audio format: ${alt}`);
+            break;
+          }
+        }
+      } else {
+        console.log(`Using audio format: ${mimeType}`);
+      }
+
+      const microphone = new MediaRecorder(userMedia, options);
+
+      console.log('✅ Microphone ready');
       setMicrophoneState(MicrophoneState.Ready);
       setMicrophone(microphone);
     } catch (err: any) {
-      console.error(err);
-
-      throw err;
+      console.error('❌ Microphone setup failed:', err);
+      setMicrophoneState(MicrophoneState.Error);
+      
+      // Provide user-friendly error messages
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMessage('Microphone permission denied. Please allow microphone access in your browser settings and try again.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setErrorMessage('No microphone found. Please connect a microphone and try again.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setErrorMessage('Microphone is being used by another application. Please close other apps using the microphone.');
+      } else if (err.name === 'OverconstrainedError') {
+        setErrorMessage('Could not satisfy audio constraints. Trying with basic settings...');
+      } else {
+        setErrorMessage(err.message || 'Failed to access microphone. Please check your browser settings.');
+      }
     }
   };
+
+  const retrySetup = useCallback(() => {
+    console.log('🔄 Retrying microphone setup...');
+    setMicrophoneState(MicrophoneState.NotSetup);
+    setErrorMessage(null);
+    setMicrophone(null);
+    // Small delay before retrying
+    setTimeout(() => {
+      setupMicrophone();
+    }, 100);
+  }, []);
 
   const stopMicrophone = useCallback(() => {
     setMicrophoneState(MicrophoneState.Pausing);
@@ -121,6 +187,8 @@ const MicrophoneContextProvider: React.FC<MicrophoneContextProviderProps> = ({
         stopMicrophone,
         setupMicrophone,
         microphoneState,
+        errorMessage,
+        retrySetup,
       }}
     >
       {children}
