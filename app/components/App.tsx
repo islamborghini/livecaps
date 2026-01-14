@@ -130,8 +130,10 @@ const App: () => JSX.Element = () => {
   // Multi-language detection context
   const multiContext = useMultiDeepgram();
 
-  // Use the appropriate context based on mode
-  const isMultiMode = transcriptionMode === "multi-detect";
+  // Determine if we're actually using multi-mode (multi-detect mode AND more than 1 spoken language)
+  const isMultiMode = transcriptionMode === "multi-detect" && sessionLanguages.spoken.length > 1;
+  
+  // Use the appropriate connection state based on actual mode being used
   const connectionState = isMultiMode ? multiContext.overallState : singleContext.connectionState;
 
   const { setupMicrophone, microphone, startMicrophone, microphoneState, errorMessage, retrySetup } =
@@ -251,13 +253,14 @@ const App: () => JSX.Element = () => {
     // Only connect when microphone is ready and not already connected
     if (microphoneState === MicrophoneState.Ready && connectionState === LiveConnectionState.CLOSED) {
       const connectBasedOnMode = async () => {
+        // isMultiMode already accounts for spoken languages count
         console.log('🔍 Deciding connection mode:', {
           isMultiMode,
           spokenLanguagesCount: sessionLanguages.spoken.length,
-          willUseMulti: isMultiMode && sessionLanguages.spoken.length > 1
+          willUseMulti: isMultiMode
         });
 
-        if (isMultiMode && sessionLanguages.spoken.length > 1) {
+        if (isMultiMode) {
           // Multi-language detection mode - use parallel connections
           console.log(`🌐 Multi-Language Detection Mode: Creating ${sessionLanguages.spoken.length} parallel connections`);
           console.log(`📍 Languages: ${sessionLanguages.spoken.join(', ')}`);
@@ -443,6 +446,64 @@ const App: () => JSX.Element = () => {
       }
     });
   }, [sessionLanguages.display]);
+
+  // Manual reconnect function
+  const handleManualReconnect = async () => {
+    if (isReconnecting.current || connectionState === LiveConnectionState.CONNECTING) {
+      console.log('⏳ Already reconnecting, please wait...');
+      return;
+    }
+
+    console.log('🔄 Manual reconnect triggered');
+    isReconnecting.current = true;
+
+    // First disconnect any existing connections
+    try {
+      multiContext.disconnectFromDeepgram();
+      singleContext.disconnectFromDeepgram();
+    } catch (e) {
+      // Ignore disconnect errors
+    }
+
+    // Clear state
+    setTranscriptBlocks([]);
+    setCurrentInterimText("");
+    currentSentenceBuffer.current = { text: "", languages: [] };
+    processedFinalTexts.current.clear();
+
+    // Wait a moment then reconnect
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    try {
+      if (isMultiMode) {
+        console.log(`🌐 Reconnecting in multi-language mode with ${sessionLanguages.spoken.length} languages`);
+        await multiContext.connectToDeepgram(sessionLanguages.spoken);
+      } else {
+        const languageParam = sessionLanguages.spoken[0] || "en";
+        console.log(`🎯 Reconnecting in single-language mode: ${languageParam}`);
+
+        const connectionOptions = {
+          model: "nova-3",
+          language: languageParam,
+          interim_results: true,
+          smart_format: true,
+          punctuate: true,
+          endpointing: 100,
+          utterance_end_ms: 1500,
+          vad_events: true,
+        };
+
+        await singleContext.connectToDeepgram(connectionOptions);
+      }
+      console.log('✅ Reconnected successfully');
+    } catch (error) {
+      console.error('❌ Failed to reconnect:', error);
+    } finally {
+      setTimeout(() => {
+        isReconnecting.current = false;
+      }, 1000);
+    }
+  };
 
   // More robust sentence detection that handles incomplete transcriptions
   const detectCompleteSentences = (text: string): string[] => {
@@ -1088,7 +1149,7 @@ const App: () => JSX.Element = () => {
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${
                     connectionState === LiveConnectionState.OPEN ? 'bg-green-500' :
-                    connectionState === LiveConnectionState.CONNECTING ? 'bg-yellow-500' : 'bg-gray-400'
+                    connectionState === LiveConnectionState.CONNECTING ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400'
                   }`} />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {connectionState === LiveConnectionState.OPEN ? 'Connected' :
@@ -1100,6 +1161,18 @@ const App: () => JSX.Element = () => {
                         ? `${sessionLanguages.spoken[0].toUpperCase()} mode`
                         : 'Multi-language mode'}
                     </span>
+                  )}
+                  {/* Reconnect Button - shows when disconnected */}
+                  {connectionState === LiveConnectionState.CLOSED && microphoneState === MicrophoneState.Ready && (
+                    <button
+                      onClick={handleManualReconnect}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Reconnect
+                    </button>
                   )}
                 </div>
 
