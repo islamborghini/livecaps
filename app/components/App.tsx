@@ -1219,7 +1219,7 @@ const App: () => JSX.Element = () => {
         /* Normal Mode */
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Control Panel */}
-          <div className="rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] p-5 backdrop-blur-sm shadow-sm dark:shadow-none">
+          <div className="relative z-30 rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] p-5 backdrop-blur-sm shadow-sm dark:shadow-none">
             <div className="flex flex-col gap-4">
               {/* Status Row */}
               <div className="flex items-center justify-between">
