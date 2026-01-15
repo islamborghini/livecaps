@@ -1099,14 +1099,14 @@ const App: () => JSX.Element = () => {
 
   /**
    * Render a single TranscriptBlock with original text and translations.
-   * Original text is smaller and brighter, translations are larger and more prominent.
+   * Supports both light and dark mode.
    */
   const renderTranscriptBlock = (block: TranscriptBlock) => {
     return (
-      <div key={block.id} className="mb-6 border-l-2 border-blue-500 pl-4">
-        {/* Original text - smaller, brighter */}
-        <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 opacity-75">
-          <span className="font-mono text-xs uppercase tracking-wide mr-2">
+      <div key={block.id} className="mb-6 border-l-2 border-[#0D9488] pl-4 hover:border-[#14B8A6] transition-colors duration-200">
+        {/* Original text - smaller, muted */}
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+          <span className="font-mono text-xs uppercase tracking-wide mr-2 text-[#0D9488]">
             [{block.original.language}]
           </span>
           {block.original.text}
@@ -1118,7 +1118,7 @@ const App: () => JSX.Element = () => {
             key={`${block.id}-${translation.language}`}
             className="text-lg text-gray-900 dark:text-white mb-2 font-medium"
           >
-            <span className="text-xs text-gray-400 mr-2">
+            <span className="text-xs text-[#14B8A6] mr-2 font-mono">
               {translation.language.toUpperCase()}:
             </span>
             {translation.text}
@@ -1132,13 +1132,13 @@ const App: () => JSX.Element = () => {
     <>
       {/* Fullscreen Mode - Unified Transcript */}
       {isFullscreen ? (
-        <div className="fixed inset-0 bg-white dark:bg-gray-900 z-50 flex flex-col transition-colors duration-200">
+        <div className="fixed inset-0 bg-white dark:bg-[#0D0D0D] z-50 flex flex-col transition-colors duration-200">
           {/* Fullscreen Header */}
-          <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between transition-colors duration-200">
+          <div className="border-b border-gray-200 dark:border-white/[0.05] px-6 py-4 flex items-center justify-between bg-white/80 dark:bg-[#0D0D0D]/80 backdrop-blur-xl">
             <div className="flex items-center gap-4">
               <div className={`w-3 h-3 rounded-full ${
-                connectionState === LiveConnectionState.OPEN ? 'bg-green-500' :
-                connectionState === LiveConnectionState.CONNECTING ? 'bg-yellow-500' : 'bg-gray-400'
+                connectionState === LiveConnectionState.OPEN ? 'bg-[#10B981]' :
+                connectionState === LiveConnectionState.CONNECTING ? 'bg-[#F59E0B]' : 'bg-gray-400'
               }`} />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {connectionState === LiveConnectionState.OPEN ? 'Connected' :
@@ -1154,7 +1154,7 @@ const App: () => JSX.Element = () => {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Translate:</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-500">Translate:</span>
                   <MultiLanguageSelector
                     type="display"
                     selectedLanguages={sessionLanguages.display}
@@ -1165,7 +1165,7 @@ const App: () => JSX.Element = () => {
 
               {/* Mode Toggle */}
               {sessionLanguages.spoken.length > 1 && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/[0.05]">
                   <TranscriptionModeToggle
                     mode={transcriptionMode}
                     onModeChange={setTranscriptionMode}
@@ -1178,7 +1178,7 @@ const App: () => JSX.Element = () => {
 
             <button
               onClick={() => setIsFullscreen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1190,7 +1190,7 @@ const App: () => JSX.Element = () => {
           {/* Unified Transcript - Fullscreen */}
           <div
             ref={fullscreenTranscriptRef}
-            className="flex-1 min-h-0 p-12 overflow-y-auto transition-colors duration-200"
+            className="flex-1 min-h-0 p-12 overflow-y-auto"
           >
             {transcriptBlocks.length > 0 || currentInterimText ? (
               <div className="max-w-4xl mx-auto">
@@ -1204,12 +1204,12 @@ const App: () => JSX.Element = () => {
                 )}
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+              <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-500">
                 <div className="text-center">
-                  <svg className="w-24 h-24 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-24 h-24 mx-auto mb-4 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
-                  <p className="text-2xl">Start speaking to see transcription and translation</p>
+                  <p className="text-2xl text-gray-600 dark:text-gray-500">Start speaking to see transcription and translation</p>
                 </div>
               </div>
             )}
@@ -1219,21 +1219,21 @@ const App: () => JSX.Element = () => {
         /* Normal Mode */
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Control Panel */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors duration-200">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] p-5 backdrop-blur-sm shadow-sm dark:shadow-none">
             <div className="flex flex-col gap-4">
               {/* Status Row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${
-                    connectionState === LiveConnectionState.OPEN ? 'bg-green-500' :
-                    connectionState === LiveConnectionState.CONNECTING ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400'
+                    connectionState === LiveConnectionState.OPEN ? 'bg-[#10B981]' :
+                    connectionState === LiveConnectionState.CONNECTING ? 'bg-[#F59E0B] animate-pulse' : 'bg-gray-500'
                   }`} />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {connectionState === LiveConnectionState.OPEN ? 'Connected' :
                      connectionState === LiveConnectionState.CONNECTING ? 'Connecting...' : 'Disconnected'}
                   </span>
                   {connectionState === LiveConnectionState.OPEN && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                    <span className="inline-flex items-center text-xs px-2.5 py-1 rounded-md bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-medium">
                       {sessionLanguages.spoken.length === 1
                         ? `${sessionLanguages.spoken[0].toUpperCase()} mode`
                         : 'Multi-language mode'}
@@ -1243,7 +1243,7 @@ const App: () => JSX.Element = () => {
                   {connectionState === LiveConnectionState.CLOSED && microphoneState === MicrophoneState.Ready && (
                     <button
                       onClick={handleManualReconnect}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1255,7 +1255,7 @@ const App: () => JSX.Element = () => {
 
                 <button
                   onClick={() => setIsFullscreen(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -1267,7 +1267,7 @@ const App: () => JSX.Element = () => {
               {/* Language Selectors Row */}
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Speaking:
                   </label>
                   <MultiLanguageSelector
@@ -1278,7 +1278,7 @@ const App: () => JSX.Element = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Translate to:
                   </label>
                   <MultiLanguageSelector
@@ -1304,10 +1304,10 @@ const App: () => JSX.Element = () => {
           </div>
 
           {/* Unified Transcript Interface */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-200">
-            <div className="bg-gray-50 dark:bg-gray-700 px-8 py-5 border-b border-gray-200 dark:border-gray-600 transition-colors duration-200">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] overflow-hidden backdrop-blur-sm shadow-sm dark:shadow-none">
+            <div className="bg-gray-50 dark:bg-white/[0.02] px-8 py-5 border-b border-gray-200 dark:border-white/[0.05]">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-3">
-                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-[#0D9488]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
                 </svg>
                 Live Transcript
@@ -1315,7 +1315,7 @@ const App: () => JSX.Element = () => {
             </div>
             <div
               ref={transcriptContainerRef}
-              className="h-96 p-8 overflow-y-auto transition-colors duration-200"
+              className="h-96 p-8 overflow-y-auto"
             >
               {transcriptBlocks.length > 0 || currentInterimText ? (
                 <div>
@@ -1331,23 +1331,23 @@ const App: () => JSX.Element = () => {
               ) : microphoneState === MicrophoneState.Error ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center">
-                    <svg className="w-16 h-16 mx-auto mb-4 text-red-400 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    <p className="text-lg text-red-600 dark:text-red-400 font-medium">Microphone Access Required</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md">
+                    <p className="text-lg text-red-400 font-medium">Microphone Access Required</p>
+                    <p className="text-sm text-gray-500 mt-2 max-w-md">
                       Please allow microphone access to use real-time transcription. 
                       Check the audio input section below for details.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+                <div className="h-full flex items-center justify-center text-gray-500">
                   <div className="text-center">
-                    <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
-                    <p className="text-lg">Start speaking to see transcription and translation</p>
+                    <p className="text-lg text-gray-600 dark:text-gray-500">Start speaking to see transcription and translation</p>
                   </div>
                 </div>
               )}
@@ -1355,59 +1355,59 @@ const App: () => JSX.Element = () => {
           </div>
 
           {/* Audio Visualizer */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors duration-200">
+          <div className="rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] p-4 backdrop-blur-sm shadow-sm dark:shadow-none">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
                   microphoneState === MicrophoneState.Error 
-                    ? 'bg-red-50 dark:bg-red-900/30' 
-                    : 'bg-blue-50 dark:bg-blue-900/30'
+                    ? 'bg-red-500/10' 
+                    : 'bg-[#0D9488]/10'
                 }`}>
                   <svg className={`w-4 h-4 ${
                     microphoneState === MicrophoneState.Error 
-                      ? 'text-red-600 dark:text-red-400' 
-                      : 'text-blue-600 dark:text-blue-400'
+                      ? 'text-red-400' 
+                      : 'text-[#0D9488]'
                   }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
                 </div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Audio Input</span>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Audio Input</span>
               </div>
               
               <div className="flex items-center">
                 {microphoneState === MicrophoneState.Error ? (
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-red-600 dark:text-red-400 max-w-xs truncate">
+                    <span className="text-xs text-red-500 dark:text-red-400 max-w-xs truncate">
                       {errorMessage || 'Microphone error'}
                     </span>
                     <button
                       onClick={retrySetup}
-                      className="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-md transition-colors shadow-sm"
                     >
                       Retry
                     </button>
                   </div>
                 ) : microphoneState === MicrophoneState.SettingUp ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-xs text-blue-600 dark:text-blue-400">Requesting permission...</span>
+                    <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs text-teal-600 dark:text-teal-400">Requesting permission...</span>
                   </div>
                 ) : microphone ? (
                   <div className="flex items-center gap-2">
                     <Visualizer microphone={microphone} height={40} />
-                    <span className="text-xs text-green-600 dark:text-green-400 font-medium">Recording</span>
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Recording</span>
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">No microphone detected</span>
+                  <span className="text-xs text-gray-500">No microphone detected</span>
                 )}
               </div>
             </div>
             
             {/* Expanded error message */}
             {microphoneState === MicrophoneState.Error && errorMessage && (
-              <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                <p className="text-sm text-red-700 dark:text-red-300">{errorMessage}</p>
-                <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-sm text-red-400">{errorMessage}</p>
+                <p className="text-xs text-red-500/70 mt-1">
                   Tip: Click the lock/camera icon in your browser's address bar to manage permissions.
                 </p>
               </div>

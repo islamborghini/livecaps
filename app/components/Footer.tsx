@@ -1,23 +1,35 @@
 /**
  * Footer Component
  * 
- * A minimal footer containing links to project resources and attribution.
+ * A minimal footer with light/dark mode support.
  * Includes GitHub repository link and brief project information.
  */
 "use client";
 
 const Footer = () => {
   return (
-    <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 py-6 px-4 md:px-6 lg:px-8 transition-colors duration-200">
-      <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-4">
-
+    <footer className="relative border-t border-gray-200 dark:border-white/[0.05] py-8 px-4 md:px-6 lg:px-8 bg-white dark:bg-[#0D0D0D] transition-colors duration-200">
+      <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-6">
         
+        {/* Left - Logo & Copyright */}
+        <div className="flex items-center gap-3">
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#0D9488] to-[#14B8A6] flex items-center justify-center">
+            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+          </div>
+          <span className="text-gray-600 dark:text-gray-400 text-sm">
+            © {new Date().getFullYear()} LiveCaps
+          </span>
+        </div>
+
+        {/* Center - Links */}
         <div className="flex items-center gap-6">
           <a
             href="https://github.com/islamborghini"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
           >
             <svg
               className="w-5 h-5"
@@ -31,22 +43,25 @@ const Footer = () => {
                 clipRule="evenodd"
               />
             </svg>
-            <span>GitHub</span>
+            <span className="text-sm">GitHub</span>
           </a>
           
-          <div className="h-6 border-l border-gray-300 dark:border-gray-600" />
-          <div className="text-white dark:text-gray-400 text-sm">
-            <span>© {new Date().getFullYear()} LiveCaps. </span>
-            <span className="pl-8">Contact: </span>
-            <a href="mailto:islam@uni.minerva.edu" className="underline">
-              islam@uni.minerva.edu
-            </a>
-          </div>
-
+          <div className="h-4 w-px bg-gray-300 dark:bg-white/10" />
           
-          <div className="pl-8 text-gray-500 dark:text-white text-sm">
-            <span>LiveCaps</span>
-          </div>
+          <a 
+            href="mailto:islam@uni.minerva.edu" 
+            className="text-gray-500 hover:text-gray-900 dark:hover:text-white text-sm transition-colors duration-200"
+          >
+            Contact
+          </a>
+        </div>
+
+        {/* Right - Powered by */}
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-600">
+          <span>Powered by</span>
+          <span className="text-gray-700 dark:text-gray-400">Deepgram</span>
+          <span>•</span>
+          <span className="text-gray-700 dark:text-gray-400">DeepL</span>
         </div>
       </div>
     </footer>

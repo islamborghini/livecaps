@@ -8,12 +8,17 @@
  */
 
 :root {
-  background: #0D0D0D;
+  background: #FFFFFF;
   font-size: 1.1rem;
+  color-scheme: light;
+  --color-primary: #0D9488;
+  --color-primary-light: #14B8A6;
+  --color-accent: #5EEAD4;
+}
+
+.dark {
+  background: #0D0D0D;
   color-scheme: dark;
-  --color-primary: #5E6AD2;
-  --color-primary-light: #8B5CF6;
-  --color-accent: #A78BFA;
 }
 
 @media only screen and (min-width: 2000px) {
@@ -28,23 +33,35 @@ html {
 }
 
 body {
-  color: rgba(255, 255, 255, 0.87);
-  background: #0D0D0D;
+  color: rgba(0, 0, 0, 0.87);
+  background: #FFFFFF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark body {
+  color: rgba(255, 255, 255, 0.87);
+  background: #0D0D0D;
 }
 
 /* Selection styling */
 ::selection {
-  background: rgba(94, 106, 210, 0.3);
+  background: rgba(13, 148, 136, 0.3);
+  color: white;
+}
+
+/* Selection styling for light mode */
+.dark ::selection {
+  background: rgba(13, 148, 136, 0.3);
   color: white;
 }
 
 @layer utilities {
   .gradient-shadow {
     box-shadow:
-      -1rem 0px 2rem 0px #5E6AD235,
-      1rem 0px 2rem 0px #8B5CF635;
+      -1rem 0px 2rem 0px #0D948835,
+      1rem 0px 2rem 0px #14B8A635;
   }
 }
 
@@ -52,9 +69,14 @@ body {
    NAVIGATION BLUR
    ============================================ */
 .nav-blur {
-  background: rgba(13, 13, 13, 0.8);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .nav-blur {
+  background: rgba(13, 13, 13, 0.8);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -65,13 +87,23 @@ body {
   position: absolute;
   inset: 0;
   background: 
-    radial-gradient(at 40% 20%, rgba(94, 106, 210, 0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(94, 106, 210, 0.1) 0px, transparent 50%),
-    radial-gradient(at 80% 50%, rgba(167, 139, 250, 0.08) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(94, 106, 210, 0.1) 0px, transparent 50%),
-    radial-gradient(at 80% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+    radial-gradient(at 40% 20%, rgba(13, 148, 136, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(20, 184, 166, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(13, 148, 136, 0.05) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(94, 234, 212, 0.04) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(13, 148, 136, 0.05) 0px, transparent 50%),
+    radial-gradient(at 80% 100%, rgba(20, 184, 166, 0.05) 0px, transparent 50%);
   animation: meshMove 20s ease-in-out infinite;
+}
+
+.dark .gradient-mesh {
+  background: 
+    radial-gradient(at 40% 20%, rgba(13, 148, 136, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(20, 184, 166, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(13, 148, 136, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(94, 234, 212, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(13, 148, 136, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 100%, rgba(20, 184, 166, 0.1) 0px, transparent 50%);
 }
 
 @keyframes meshMove {
@@ -93,13 +125,23 @@ body {
    GLASSMORPHISM CARDS
    ============================================ */
 .glass-card {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .glass-card:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.dark .glass-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark .glass-card:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.1);
 }
@@ -186,7 +228,7 @@ body {
 .typing-animation::after {
   content: '|';
   animation: blink 1s step-end infinite;
-  color: #5E6AD2;
+  color: #0D9488;
   margin-left: 2px;
 }
 
@@ -237,10 +279,10 @@ body {
 /* Glow effect */
 @keyframes glow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(94, 106, 210, 0.3);
+    box-shadow: 0 0 20px rgba(13, 148, 136, 0.3);
   }
   50% {
-    box-shadow: 0 0 40px rgba(94, 106, 210, 0.5);
+    box-shadow: 0 0 40px rgba(13, 148, 136, 0.5);
   }
 }
 
@@ -285,7 +327,7 @@ body {
   inset: 0;
   border-radius: 1rem;
   padding: 1px;
-  background: linear-gradient(135deg, #5E6AD2, #8B5CF6);
+  background: linear-gradient(135deg, #0D9488, #14B8A6);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: xor;
   -webkit-mask-composite: xor;
