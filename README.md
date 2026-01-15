@@ -137,16 +137,14 @@ Key directories:
 - [public](public)  
    Static assets such as images and the main UI screenshot referenced from the README.
 
-- [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md), [MULTI_LANGUAGE_ARCHITECTURE.md](MULTI_LANGUAGE_ARCHITECTURE.md), [CODEBASE_WALKTHROUGH.md](CODEBASE_WALKTHROUGH.md)  
-   In-depth documentation covering system architecture, multi-language design, and an end-to-end code walkthrough.
+- [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md)  
+   Single, in-depth guide covering system architecture, multi-language design, data flow, and an end-to-end code walkthrough.
 
 ---
 
 ## Further Reading
 
-- [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) – high-level system architecture, data flow, backend APIs, and deployment notes.  
-- [MULTI_LANGUAGE_ARCHITECTURE.md](MULTI_LANGUAGE_ARCHITECTURE.md) – design and behavior of the multi-language detection mode and winner selection.  
-- [CODEBASE_WALKTHROUGH.md](CODEBASE_WALKTHROUGH.md) – detailed, narrative walkthrough of the runtime from audio capture to translated output.  
+- [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md) – consolidated system overview, architecture, multi-language design, and runtime walkthrough.  
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) – current status of larger features and planned work.  
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md) – current limitations and open issues.  
 - [CHANGELOG.md](CHANGELOG.md) – release history and notable changes.

@@ -1,44 +1,15 @@
-# LiveCaps Multi-Language Transcription Architecture
+# LiveCaps Multi-Language Architecture (Deprecated)
 
-## Executive Summary
+The detailed description of the multi-language transcription architecture (parallel Deepgram connections, confidence-based winner selection, and audio duplication) has been merged into the main architecture guide:
 
-LiveCaps implements a sophisticated **parallel WebSocket architecture** for multi-language speech recognition. When users select multiple spoken languages, the system creates separate Deepgram connections for each language, processes the same audio through all of them simultaneously, and uses a **confidence-based winner selection algorithm** to choose the best transcription result.
+- [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md)
 
----
+See in particular:
 
-## Table of Contents
+- Section 7: Multi-Language Detection Mode.
+- Section 5: End-to-End Data Flow.
 
-1. [Overview](#1-overview)
-2. [Architecture Diagram](#2-architecture-diagram)
-3. [Core Components](#3-core-components)
-4. [How It Works - Step by Step](#4-how-it-works---step-by-step)
-5. [Single vs Multi Mode](#5-single-vs-multi-mode)
-6. [Confidence-Based Winner Selection](#6-confidence-based-winner-selection)
-7. [Audio Distribution](#7-audio-distribution)
-8. [Translation Pipeline](#8-translation-pipeline)
-9. [Key Files Reference](#9-key-files-reference)
-
----
-
-## 1. Overview
-
-### The Problem
-Traditional speech-to-text systems require you to specify ONE source language. But what if:
-- A speaker switches between languages (code-switching)?
-- Multiple speakers use different languages?
-- You're unsure which language will be spoken?
-
-### The Solution
-LiveCaps solves this by running **N parallel Deepgram connections** (one per selected language) and comparing their outputs in real-time:
-
-```
-                         ┌──────────────────────┐
-                         │  User's Microphone   │
-                         └──────────┬───────────┘
-                                    │
-                              Audio Blob
-                                    │
-                                    ▼
+This file is left in place only to preserve existing links.
                          ┌──────────────────────┐
                          │   Audio Duplicator   │
                          │   (Creates N copies) │

@@ -1,43 +1,12 @@
-# LiveCaps: Real-Time Speech Transcription and Translation System
+# LiveCaps Technical Documentation (Deprecated)
 
-## Technical Documentation & Architecture Guide
+This document has been superseded by the consolidated architecture and walkthrough guide:
 
----
+- [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md)
 
-## Table of Contents
+Please refer to that file for the up-to-date system overview, architecture diagrams, data flow, translation pipeline, caching, and deployment details.
 
-1. [System Overview](#system-overview)
-2. [Architecture Diagram](#architecture-diagram)
-3. [Core Components](#core-components)
-4. [Data Flow](#data-flow)
-5. [Translation System](#translation-system)
-6. [Caching Architecture](#caching-architecture)
-7. [Audio Processing](#audio-processing)
-8. [Performance Optimizations](#performance-optimizations)
-9. [API Reference](#api-reference)
-10. [Deployment & Configuration](#deployment--configuration)
-
----
-
-## System Overview
-
-LiveCaps is a sophisticated real-time speech transcription and translation application built with Next.js 14, leveraging Deepgram's Nova-3 speech recognition and DeepL/Google Translate APIs. The system provides instantaneous speech-to-text conversion with simultaneous translation to multiple languages.
-
-### Key Features
-
-- **Real-time Audio Processing**: 100ms audio chunks for minimal latency
-- **Live Speech Recognition**: Deepgram Nova-3 WebSocket integration
-- **Instant Translation**: Multi-provider translation with intelligent caching
-- **Smart Sentence Detection**: Advanced algorithms for natural sentence boundaries
-- **Non-blocking Architecture**: Asynchronous processing prevents UI freezing
-- **Intelligent Caching**: Server-side translation cache with preloaded common phrases
-- **Multi-language Support**: Spanish, French, Japanese, German, Portuguese, and more
-
----
-
-## Architecture Diagram
-
-```
+This file is kept only to avoid breaking existing links.
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend (React/Next.js)                 │
 ├─────────────────────────────────────────────────────────────────┤

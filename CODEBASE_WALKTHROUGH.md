@@ -1,43 +1,12 @@
-# LiveCaps Codebase Walkthrough (End-to-End)
+# LiveCaps Codebase Walkthrough (Deprecated)
 
-This document is a deep, article-style walkthrough of the LiveCaps codebase: how the Next.js app is structured, how audio becomes text, how text becomes translations, and how state flows through the UI.
+This end-to-end walkthrough has been replaced by the consolidated architecture and codebase guide:
 
-This is written for someone who is **new to this project** (and can be new-ish to Next.js / React). It intentionally explains basic concepts (what a Context Provider is, what a route handler is, what “interim vs final transcripts” mean) and then connects those concepts back to the exact way this code is written.
+- [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md)
 
-If you want to quickly jump to the “critical path”, start with:
+That document now covers the runtime mental model, data flow, frontend orchestration, Deepgram integration, translation API, and caching in a single place.
 
-1) **Runtime overview** → (Audio → Deepgram → Sentence Buffer → Translation Queue → Render)
-2) **Frontend orchestration** → `app/components/App.tsx`
-3) **Deepgram auth + WebSocket** → `app/context/DeepgramContextProvider.tsx` and `app/api/authenticate/route.ts`
-4) **Translation API** → `app/api/translate/route.ts`
-5) **Cache + cache API** → `app/lib/translationCache.ts` and `app/api/cache/route.ts`
-
----
-
-## 0) A beginner-friendly mental model (read this first)
-
-If you remember only one thing, remember this:
-
-> LiveCaps is two streaming loops running at the same time: one loop for **speech → text** and one loop for **text → translated text**.
-
-### 0.1 Two loops in plain English
-
-1) **Speech → Text loop (real-time captioning)**
-
-- Your browser records audio in small slices (100ms).
-- Each slice is sent to Deepgram over a WebSocket.
-- Deepgram sends back transcript updates continuously.
-
-2) **Text → Translation loop (asynchronous + batched)**
-
-- When the app decides a sentence is “complete enough”, it adds it to a queue.
-- A background worker (still in the browser) pulls from that queue.
-- It calls a Next.js API route (`/api/translate`) which calls DeepL (or falls back to Google Translate).
-- When a translation returns, the UI updates the translated panel.
-
-Why separate loops? Because translation is slower than transcription. If you tie them together, translation latency can make your transcription feel “stuck.”
-
-### 0.2 What runs where (client vs server)
+This file is retained only so existing links continue to resolve.
 
 LiveCaps uses Next.js, which can run code in two main places:
 
