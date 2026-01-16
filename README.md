@@ -185,7 +185,7 @@ Most configuration lives in the context providers and services:
 - Translation cache settings (TTL, size, preloaded phrases):
    - `app/lib/translationCache.ts`
 
-Environment variables are documented in `sample.env.local` and in [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md).
+Environment variables are documented in `sample.env.local` and in [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md).
 
 ---
 
@@ -203,7 +203,7 @@ Empirically, under normal network conditions, the system targets:
 - Speech-to-text latency on the order of 100 ms.
 - Translation latency in the range of 200–500 ms (faster on cache hits).
 
-Actual performance depends on network conditions and external provider behavior; see [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) for more detail.
+Actual performance depends on network conditions and external provider behavior; see [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md) for more detail.
 
 ---
 
@@ -215,11 +215,7 @@ Actual performance depends on network conditions and external provider behavior;
 - Tailwind CSS is used for styling.
 
 Codebase-level documentation:
-
-- [CODEBASE_WALKTHROUGH.md](CODEBASE_WALKTHROUGH.md) – end-to-end narrative of the runtime.
-- [MULTI_LANGUAGE_ARCHITECTURE.md](MULTI_LANGUAGE_ARCHITECTURE.md) – in-depth description of multi-language detection.
-- [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) – system diagrams, caching, and deployment notes.
-
+[ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md) All the technical stuff explained here
 ---
 
 ## Known Issues
