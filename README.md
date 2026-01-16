@@ -4,6 +4,7 @@ LiveCaps is a real-time speech transcription and translation system built on top
 
 The application runs entirely in the browser on top of Next.js, with a thin set of API routes for authentication, translation, and caching. Audio is streamed in small chunks to Deepgram, converted into text, grouped into sentences, and then translated asynchronously into one or more target languages.
 
+![alt text](image.png)
 ---
 
 ## Highlights and Techniques
@@ -145,7 +146,6 @@ Key directories:
 ## Further Reading
 
 - [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md) – consolidated system overview, architecture, multi-language design, and runtime walkthrough.  
-- [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) – current status of larger features and planned work.  
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md) – current limitations and open issues.  
 - [CHANGELOG.md](CHANGELOG.md) – release history and notable changes.
 
