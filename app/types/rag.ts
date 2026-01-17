@@ -281,8 +281,29 @@ export interface TermVectorRecord {
 
 /**
  * Result from vector similarity search
+ * Used for hybrid search combining semantic and phonetic matching
  */
 export interface VectorSearchResult {
+  /** The matched extracted term */
+  term: ExtractedTerm;
+
+  /** Semantic similarity score from vector search (0-1) */
+  semanticScore: number;
+
+  /** Phonetic similarity score (0-1) */
+  phoneticScore: number;
+
+  /** Combined weighted score (0-1) */
+  combinedScore: number;
+
+  /** How the match was primarily found */
+  matchType: "phonetic" | "semantic" | "exact";
+}
+
+/**
+ * Raw result from Upstash Vector search
+ */
+export interface UpstashVectorResult {
   /** The matched term record ID */
   id: string;
 
@@ -303,17 +324,26 @@ export interface RAGSessionStats {
   /** Total terms in the knowledge base */
   totalTerms: number;
 
-  /** Number of corrections made in this session */
-  correctionsApplied: number;
+  /** Number of documents indexed */
+  documentCount: number;
 
-  /** Number of transcripts processed */
-  transcriptsProcessed: number;
+  /** Last update timestamp */
+  lastUpdated: Date | null;
 
-  /** Average processing time per correction request */
-  avgProcessingTimeMs: number;
+  /** Breakdown of terms by category */
+  categoryBreakdown: Record<string, number>;
 
-  /** Most frequently corrected terms */
-  topCorrections: Array<{
+  /** Number of corrections made in this session (optional) */
+  correctionsApplied?: number;
+
+  /** Number of transcripts processed (optional) */
+  transcriptsProcessed?: number;
+
+  /** Average processing time per correction request (optional) */
+  avgProcessingTimeMs?: number;
+
+  /** Most frequently corrected terms (optional) */
+  topCorrections?: Array<{
     original: string;
     corrected: string;
     count: number;
