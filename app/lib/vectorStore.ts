@@ -437,9 +437,14 @@ export async function getSessionStats(
   console.log(`📊 Getting stats for session ${sessionId}...`);
 
   try {
-    // Query with a reasonable limit to avoid exceeding read limits
+    // Use a random unit vector for the query (better than zero vector)
+    // This works because we're using filter which is the primary selection
+    const randomVector = new Array(768).fill(0).map(() => Math.random() - 0.5);
+    const magnitude = Math.sqrt(randomVector.reduce((sum, v) => sum + v * v, 0));
+    const normalizedVector = randomVector.map(v => v / magnitude);
+
     const searchResults = await index.query({
-      vector: new Array(768).fill(0),
+      vector: normalizedVector,
       topK: 100, // Reasonable sample size
       includeMetadata: true,
       includeVectors: false,
