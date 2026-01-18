@@ -11,21 +11,19 @@
  */
 
 import mammoth from "mammoth";
+import { extractText } from "unpdf";
 import {
   ExtractedTerm,
   UploadedContent,
 } from "../types/rag";
 import { extractTerms, TermExtractionConfig } from "./termExtractor";
 
-// Dynamic import for pdf-parse to avoid Next.js bundling issues
+// Parse PDF using unpdf (compatible with Next.js App Router)
 async function parsePDF(buffer: Buffer): Promise<string> {
-  // Use dynamic import to avoid webpack bundling issues with pdfjs-dist
-  const { PDFParse } = await import("pdf-parse");
+  // unpdf requires Uint8Array, not Buffer
   const uint8Array = new Uint8Array(buffer);
-  const pdfParser = new PDFParse({ data: uint8Array });
-  const textResult = await pdfParser.getText();
-  await pdfParser.destroy();
-  return textResult.text || "";
+  const { text } = await extractText(uint8Array, { mergePages: true });
+  return text || "";
 }
 
 /**

@@ -36,6 +36,7 @@ import Visualizer from "./Visualizer";
 import { translateBySentences, cacheUtils } from "../services/translationService";
 import MultiLanguageSelector from "./MultiLanguageSelector";
 import TranscriptionModeToggle from "./TranscriptionModeToggle";
+import RAGUpload from "./RAGUpload";
 import { TranscriptionMode, WinnerTranscript } from "../types/multiDeepgram";
 
 /**
@@ -1102,6 +1103,9 @@ const App: () => JSX.Element = () => {
    * Supports both light and dark mode.
    */
   const renderTranscriptBlock = (block: TranscriptBlock) => {
+    // Debug: log when rendering blocks
+    console.log(`🎨 Rendering block: ${block.id}, text: "${block.original.text.substring(0, 30)}..."`);
+    
     return (
       <div key={block.id} className="mb-6 border-l-2 border-[#0D9488] pl-4 hover:border-[#14B8A6] transition-colors duration-200">
         {/* Original text - smaller, muted */}
@@ -1176,15 +1180,20 @@ const App: () => JSX.Element = () => {
               )}
             </div>
 
-            <button
-              onClick={() => setIsFullscreen(false)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Exit Fullscreen
-            </button>
+            <div className="flex items-center gap-3">
+              {/* RAG Upload - Compact Mode in Fullscreen */}
+              <RAGUpload compact />
+
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Exit Fullscreen
+              </button>
+            </div>
           </div>
 
           {/* Unified Transcript - Fullscreen */}
@@ -1252,6 +1261,9 @@ const App: () => JSX.Element = () => {
                     </button>
                   )}
                 </div>
+
+                {/* RAG Upload - Compact Mode */}
+                <RAGUpload compact />
 
                 <button
                   onClick={() => setIsFullscreen(true)}

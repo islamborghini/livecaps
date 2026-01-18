@@ -65,6 +65,20 @@ body {
   }
 }
 
+/* Toast auto-dismiss animation */
+@keyframes shrink-x {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-shrink-x {
+  animation: shrink-x 5s linear forwards;
+}
+
 /* ============================================
    NAVIGATION BLUR
    ============================================ */

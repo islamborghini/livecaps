@@ -47,3 +47,6 @@ next-env.d.ts
 
 # pycharm
 .idea
+
+#claude instructions
+.claude

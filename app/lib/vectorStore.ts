@@ -119,12 +119,23 @@ function metadataToTerm(metadata: Record<string, unknown>): ExtractedTerm {
 }
 
 /**
+ * Progress callback type for indexing
+ */
+export type IndexProgressCallback = (progress: {
+  stage: "parsing" | "extracting" | "indexing" | "complete";
+  current: number;
+  total: number;
+  message: string;
+}) => void;
+
+/**
  * Index all terms from a session's uploaded content
  */
 export async function indexSessionContent(
   sessionId: string,
   terms: ExtractedTerm[],
-  config: Partial<VectorStoreConfig> = {}
+  config: Partial<VectorStoreConfig> = {},
+  onProgress?: IndexProgressCallback
 ): Promise<{ indexed: number; failed: number; duration: number }> {
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const startTime = Date.now();
@@ -136,13 +147,23 @@ export async function indexSessionContent(
   const index = getVectorIndex(cfg);
   let indexed = 0;
   let failed = 0;
+  const totalBatches = Math.ceil(terms.length / cfg.indexBatchSize);
 
   console.log(`📥 Indexing ${terms.length} terms for session ${sessionId}...`);
 
   // Process in batches
   for (let i = 0; i < terms.length; i += cfg.indexBatchSize) {
+    const batchNum = Math.floor(i / cfg.indexBatchSize) + 1;
     const batch = terms.slice(i, i + cfg.indexBatchSize);
     const batchTexts = batch.map(t => `${t.term}: ${t.context.substring(0, 200)}`);
+
+    // Report progress
+    onProgress?.({
+      stage: "indexing",
+      current: batchNum,
+      total: totalBatches,
+      message: `${Math.round((batchNum / totalBatches) * 100)}% done`,
+    });
 
     try {
       // Generate embeddings for the batch
@@ -174,16 +195,24 @@ export async function indexSessionContent(
       if (vectors.length > 0) {
         await index.upsert(vectors);
         indexed += vectors.length;
-        console.log(`  ✅ Indexed batch ${Math.floor(i / cfg.indexBatchSize) + 1}: ${vectors.length} terms`);
+        console.log(`  ✅ Indexed batch ${batchNum}: ${vectors.length} terms`);
       }
     } catch (error) {
-      console.error(`  ❌ Failed to index batch ${Math.floor(i / cfg.indexBatchSize) + 1}:`, error);
+      console.error(`  ❌ Failed to index batch ${batchNum}:`, error);
       failed += batch.length;
     }
   }
 
   const duration = Date.now() - startTime;
   console.log(`📊 Indexing complete: ${indexed} indexed, ${failed} failed, ${duration}ms`);
+
+  // Report completion
+  onProgress?.({
+    stage: "complete",
+    current: totalBatches,
+    total: totalBatches,
+    message: `Indexing complete: ${indexed} terms indexed`,
+  });
 
   return { indexed, failed, duration };
 }

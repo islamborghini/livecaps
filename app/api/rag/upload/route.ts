@@ -220,6 +220,18 @@ export async function POST(request: NextRequest) {
       categoryBreakdown[category] = (categoryBreakdown[category] || 0) + 1;
     }
 
+    // Get sample terms for each category (for debug/preview)
+    const sampleTerms: Record<string, string[]> = {};
+    for (const term of terms) {
+      const category = term.category || "other";
+      if (!sampleTerms[category]) {
+        sampleTerms[category] = [];
+      }
+      if (sampleTerms[category].length < 10) { // Max 10 samples per category
+        sampleTerms[category].push(term.term);
+      }
+    }
+
     // Build response
     const processingTimeMs = Date.now() - startTime;
 
@@ -242,6 +254,7 @@ export async function POST(request: NextRequest) {
         indexed: indexedCount,
         limited: terms.length >= MAX_TERMS_TO_INDEX,
         categories: categoryBreakdown,
+        samples: sampleTerms, // Sample terms for debug/preview
       },
       processingTimeMs,
       instructions: {
