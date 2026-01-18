@@ -10,13 +10,23 @@
  * Uses the termExtractor module for intelligent term extraction.
  */
 
-import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import {
   ExtractedTerm,
   UploadedContent,
 } from "../types/rag";
 import { extractTerms, TermExtractionConfig } from "./termExtractor";
+
+// Dynamic import for pdf-parse to avoid Next.js bundling issues
+async function parsePDF(buffer: Buffer): Promise<string> {
+  // Use dynamic import to avoid webpack bundling issues with pdfjs-dist
+  const { PDFParse } = await import("pdf-parse");
+  const uint8Array = new Uint8Array(buffer);
+  const pdfParser = new PDFParse({ data: uint8Array });
+  const textResult = await pdfParser.getText();
+  await pdfParser.destroy();
+  return textResult.text || "";
+}
 
 /**
  * Supported MIME types for document parsing
@@ -41,12 +51,8 @@ export function isSupportedMimeType(mimeType: string): boolean {
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Convert Buffer to Uint8Array for pdf-parse
-    const uint8Array = new Uint8Array(buffer);
-    const pdfParser = new PDFParse({ data: uint8Array });
-    const textResult = await pdfParser.getText();
-    await pdfParser.destroy();
-    return textResult.text || "";
+    // Use the parsePDF helper which handles dynamic import
+    return await parsePDF(buffer);
   } catch (error) {
     console.error("❌ PDF parsing error:", error);
     throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
