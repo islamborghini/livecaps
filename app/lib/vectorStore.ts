@@ -376,19 +376,28 @@ export async function hybridSearch(
       }
     } else {
       // Add new result from phonetic match
+      // For phonetic-only matches, use the full phonetic score (not weighted)
+      // since there's no semantic component to combine with
       resultMap.set(match.term.normalizedTerm, {
         term: match.term,
         semanticScore: 0,
         phoneticScore: match.similarity,
-        combinedScore: match.similarity * cfg.phoneticWeight,
+        combinedScore: match.similarity, // Use full phonetic score, not weighted
         matchType: "phonetic",
       });
     }
   }
 
   // Convert to array and sort
+  // Use a lower threshold for phonetic-only matches
+  const phoneticMinSimilarity = cfg.minSimilarity * 0.6; // Lower threshold for phonetic matches
   const results = Array.from(resultMap.values())
-    .filter(r => r.combinedScore >= cfg.minSimilarity)
+    .filter(r => {
+      // For semantic matches, use full threshold
+      // For phonetic-only matches, use lower threshold
+      const threshold = r.matchType === "phonetic" ? phoneticMinSimilarity : cfg.minSimilarity;
+      return r.combinedScore >= threshold;
+    })
     .sort((a, b) => b.combinedScore - a.combinedScore)
     .slice(0, topK);
 
@@ -543,6 +552,54 @@ export async function hasSessionContent(
 ): Promise<boolean> {
   const stats = await getSessionStats(sessionId, config);
   return stats.totalTerms > 0;
+}
+
+/**
+ * Fetch all terms from a session for phonetic matching
+ * Retrieves term metadata from the vector store
+ */
+export async function getSessionTerms(
+  sessionId: string,
+  config: Partial<VectorStoreConfig> = {}
+): Promise<ExtractedTerm[]> {
+  const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
+  const index = getVectorIndex(cfg);
+
+  console.log(`📚 Fetching all terms for session ${sessionId}...`);
+
+  try {
+    // Use a random unit vector for the query
+    const randomVector = new Array(768).fill(0).map(() => Math.random() - 0.5);
+    const magnitude = Math.sqrt(randomVector.reduce((sum, v) => sum + v * v, 0));
+    const normalizedVector = randomVector.map(v => v / magnitude);
+
+    // Query with high topK to get as many terms as possible
+    const searchResults = await index.query({
+      vector: normalizedVector,
+      topK: 500, // Get up to 500 terms
+      includeMetadata: true,
+      includeVectors: false,
+      filter: `sessionId = '${sessionId}'`,
+    });
+
+    if (!searchResults || searchResults.length === 0) {
+      console.log(`  No terms found for session ${sessionId}`);
+      return [];
+    }
+
+    // Convert metadata to ExtractedTerm objects
+    const terms: ExtractedTerm[] = [];
+    for (const result of searchResults) {
+      if (!result.metadata) continue;
+      terms.push(metadataToTerm(result.metadata));
+    }
+
+    console.log(`  Retrieved ${terms.length} terms for phonetic matching`);
+    return terms;
+  } catch (error) {
+    console.error(`  Error fetching terms for session ${sessionId}:`, error);
+    return [];
+  }
 }
 
 /**

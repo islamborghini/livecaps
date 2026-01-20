@@ -34,6 +34,10 @@ interface RAGUploadProps {
   uploadedFiles?: UploadedFile[];
   /** External setter for uploaded files */
   setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+  /** Whether RAG corrections are enabled */
+  isRAGEnabled?: boolean;
+  /** Setter for RAG enabled state */
+  setIsRAGEnabled?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface UploadResult {
@@ -82,6 +86,8 @@ export function RAGUpload({
   className = "",
   uploadedFiles: externalUploadedFiles,
   setUploadedFiles: externalSetUploadedFiles,
+  isRAGEnabled,
+  setIsRAGEnabled,
 }: RAGUploadProps) {
   const {
     sessionId,
@@ -509,6 +515,22 @@ export function RAGUpload({
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+            {/* RAG Toggle - Enable/Disable corrections */}
+            {!(isUploading || isStreamUploading) && setIsRAGEnabled && (
+              <button
+                onClick={() => setIsRAGEnabled(prev => !prev)}
+                className={`p-1.5 transition-colors ${
+                  isRAGEnabled 
+                    ? 'text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300' 
+                    : 'text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400'
+                }`}
+                title={isRAGEnabled ? 'Corrections enabled (click to disable)' : 'Corrections disabled (click to enable)'}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.061l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.061 1.06l1.06 1.06z" />
                 </svg>
               </button>
             )}

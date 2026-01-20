@@ -24,7 +24,7 @@ import {
   RAGConfig,
   DEFAULT_RAG_CONFIG,
 } from "../types/rag";
-import { hybridSearch, searchSessionTerms, hasSessionContent } from "./vectorStore";
+import { hybridSearch, searchSessionTerms, hasSessionContent, getSessionTerms } from "./vectorStore";
 import { processCorrection } from "./llmCorrection";
 
 /**
@@ -247,21 +247,39 @@ export async function correctTranscript(
 
     log(`Built ${searchQueries.length} search queries`, searchQueries, true);
 
-    // Step 4: Search for matching terms
+    // Step 4: Fetch session terms for hybrid search (phonetic + semantic)
+    let sessionTerms: ExtractedTerm[] = cfg.cachedTerms || [];
+    
+    if (sessionTerms.length === 0 && cfg.useHybridSearch) {
+      log("Fetching session terms for hybrid search...");
+      sessionTerms = await getSessionTerms(request.sessionId);
+      log(`Retrieved ${sessionTerms.length} terms for phonetic matching`);
+      
+      // Debug: log some sample terms
+      if (sessionTerms.length > 0) {
+        const sampleTerms = sessionTerms.slice(0, 5).map(t => t.term);
+        log(`Sample terms: ${sampleTerms.join(", ")}`);
+      }
+    }
+
+    // Step 5: Search for matching terms
     let candidateTerms: VectorSearchResult[] = [];
 
-    if (cfg.skipVectorSearch && cfg.cachedTerms?.length) {
+    if (cfg.skipVectorSearch && sessionTerms.length > 0) {
       // Phonetic-only search using cached terms (for testing or offline mode)
       log("Using phonetic-only search with cached terms");
       const { findPhoneticallySimilarTerms } = await import("./phoneticMatcher");
       
       for (const query of searchQueries.slice(0, 5)) {
-        const phoneticMatches = findPhoneticallySimilarTerms(query, cfg.cachedTerms, {
+        log(`Phonetic search for: "${query}"`);
+        const phoneticMatches = findPhoneticallySimilarTerms(query, sessionTerms, {
           minSimilarity: 0.3,
           maxResults: cfg.maxTermsToRetrieve,
         });
         
+        log(`  Found ${phoneticMatches.length} phonetic matches`);
         for (const match of phoneticMatches) {
+          log(`    - "${match.term.term}" (similarity: ${match.similarity.toFixed(3)})`);
           candidateTerms.push({
             term: match.term,
             semanticScore: 0,
@@ -271,13 +289,15 @@ export async function correctTranscript(
           });
         }
       }
-    } else if (cfg.useHybridSearch && cfg.cachedTerms?.length) {
-      // Use hybrid search with cached terms for phonetic matching
+    } else if (cfg.useHybridSearch && sessionTerms.length > 0) {
+      // Use hybrid search with session terms for phonetic matching
+      log("Using hybrid search (semantic + phonetic)");
       for (const query of searchQueries.slice(0, 5)) { // Limit queries
+        log(`Hybrid search for: "${query}"`);
         const results = await hybridSearch(
           request.sessionId,
           query,
-          cfg.cachedTerms,
+          sessionTerms,
           cfg.maxTermsToRetrieve
         );
         candidateTerms.push(...results);
@@ -306,6 +326,14 @@ export async function correctTranscript(
     candidateTerms = Array.from(uniqueTerms.values());
 
     log(`Found ${candidateTerms.length} unique candidate terms`);
+    
+    // Debug: log candidate terms found
+    if (candidateTerms.length > 0) {
+      log("Candidate terms for correction:");
+      for (const ct of candidateTerms.slice(0, 10)) {
+        log(`  - "${ct.term.term}" (semantic: ${ct.semanticScore.toFixed(3)}, phonetic: ${ct.phoneticScore.toFixed(3)}, combined: ${ct.combinedScore.toFixed(3)}, type: ${ct.matchType})`);
+      }
+    }
 
     // Early exit: no matching terms found
     if (candidateTerms.length === 0) {
@@ -313,7 +341,7 @@ export async function correctTranscript(
       return createUnchangedResponse(request, startTime);
     }
 
-    // Step 5: Apply corrections using LLM
+    // Step 6: Apply corrections using LLM
     const correctionResult = await processCorrection(
       request,
       candidateTerms,
