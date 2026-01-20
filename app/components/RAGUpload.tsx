@@ -30,6 +30,10 @@ interface RAGUploadProps {
   onSessionCleared?: () => void;
   /** Custom class names */
   className?: string;
+  /** External uploaded files state (for lifting state up) */
+  uploadedFiles?: UploadedFile[];
+  /** External setter for uploaded files */
+  setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
 }
 
 interface UploadResult {
@@ -43,7 +47,7 @@ interface UploadResult {
 }
 
 /** Represents an uploaded file with its session */
-interface UploadedFile {
+export interface UploadedFile {
   id: string;
   fileName: string;
   sessionId: string;
@@ -76,6 +80,8 @@ export function RAGUpload({
   onUploadComplete,
   onSessionCleared,
   className = "",
+  uploadedFiles: externalUploadedFiles,
+  setUploadedFiles: externalSetUploadedFiles,
 }: RAGUploadProps) {
   const {
     sessionId,
@@ -90,7 +96,10 @@ export function RAGUpload({
   } = useRAG({ debug: true });
 
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  // Use external state if provided, otherwise use internal state
+  const [internalUploadedFiles, setInternalUploadedFiles] = useState<UploadedFile[]>([]);
+  const uploadedFiles = externalUploadedFiles ?? internalUploadedFiles;
+  const setUploadedFiles = externalSetUploadedFiles ?? setInternalUploadedFiles;
   const [sampleTerms, setSampleTerms] = useState<Record<string, string[]> | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -264,7 +273,7 @@ export function RAGUpload({
         setUploadStage("");
       }
     },
-    [onUploadComplete, refreshSessionInfo, setRAGSessionId, uploadedFiles]
+    [onUploadComplete, refreshSessionInfo, setRAGSessionId, uploadedFiles, setUploadedFiles]
   );
 
   /**
@@ -368,7 +377,7 @@ export function RAGUpload({
     if (uploadedFiles.length === 1) {
       onSessionCleared?.();
     }
-  }, [uploadedFiles, onSessionCleared]);
+  }, [uploadedFiles, onSessionCleared, setUploadedFiles]);
 
   /**
    * Clear all sessions
@@ -390,7 +399,7 @@ export function RAGUpload({
     setSampleTerms(null);
     setShowDebug(false);
     onSessionCleared?.();
-  }, [clearSession, onSessionCleared, uploadedFiles]);
+  }, [clearSession, onSessionCleared, uploadedFiles, setUploadedFiles]);
 
   // ==========================================================================
   // Render: Compact Mode

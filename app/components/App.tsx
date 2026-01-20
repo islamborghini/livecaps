@@ -36,7 +36,7 @@ import Visualizer from "./Visualizer";
 import { translateBySentences, cacheUtils } from "../services/translationService";
 import MultiLanguageSelector from "./MultiLanguageSelector";
 import TranscriptionModeToggle from "./TranscriptionModeToggle";
-import RAGUpload from "./RAGUpload";
+import RAGUpload, { UploadedFile } from "./RAGUpload";
 import { useRAG } from "@/app/hooks/useRAG";
 import { WordConfidence } from "@/app/types/rag";
 import { TranscriptionMode, WinnerTranscript } from "../types/multiDeepgram";
@@ -149,6 +149,9 @@ const App: () => JSX.Element = () => {
     correct: ragCorrect,
     shouldTriggerRAG,
   } = useRAG({ debug: false });
+
+  // Uploaded files state - lifted from RAGUpload to persist across fullscreen toggle
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // Track blocks that are pending RAG correction to avoid duplicate corrections
   const pendingRAGCorrections = useRef<Set<string>>(new Set());
@@ -1320,7 +1323,7 @@ const App: () => JSX.Element = () => {
 
             <div className="flex items-center gap-3">
               {/* RAG Upload - Compact Mode in Fullscreen */}
-              <RAGUpload compact />
+              <RAGUpload compact uploadedFiles={uploadedFiles} setUploadedFiles={setUploadedFiles} />
 
               <button
                 onClick={() => setIsFullscreen(false)}
@@ -1401,7 +1404,7 @@ const App: () => JSX.Element = () => {
                 </div>
 
                 {/* RAG Upload - Compact Mode */}
-                <RAGUpload compact />
+                <RAGUpload compact uploadedFiles={uploadedFiles} setUploadedFiles={setUploadedFiles} />
 
                 <button
                   onClick={() => setIsFullscreen(true)}
