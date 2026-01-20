@@ -15,7 +15,7 @@ import crypto from "crypto";
 
 // Configuration
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_TERMS_TO_INDEX = 500;
+const MAX_TERMS_TO_INDEX = 150;
 const ALLOWED_EXTENSIONS = [".pdf", ".pptx", ".docx", ".txt", ".md"];
 
 /**
@@ -152,10 +152,12 @@ export async function POST(request: NextRequest) {
         // Parse document
         const parsedContent = await parseDocument(buffer, mimeType, file.name);
 
-        if (!parsedContent.rawText || parsedContent.rawText.length === 0) {
+        // Check if document has actual text content (trim whitespace)
+        const trimmedText = (parsedContent.rawText || "").trim();
+        if (!trimmedText || trimmedText.length === 0) {
           sendProgress({ 
             type: "error", 
-            message: "Document appears to be empty or could not extract text" 
+            message: "Document appears to be empty" 
           });
           closeStream();
           return;
@@ -170,6 +172,16 @@ export async function POST(request: NextRequest) {
 
         // Get terms
         let terms: ExtractedTerm[] = parsedContent.terms || [];
+
+        // Check if any terms were extracted
+        if (terms.length === 0) {
+          sendProgress({ 
+            type: "error", 
+            message: "No content found to index. Please upload a document with text." 
+          });
+          closeStream();
+          return;
+        }
 
         // Limit terms if needed
         if (terms.length > MAX_TERMS_TO_INDEX) {

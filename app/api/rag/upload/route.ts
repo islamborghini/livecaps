@@ -18,7 +18,7 @@ import crypto from "crypto";
 
 // Configuration
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_TERMS_TO_INDEX = 500;
+const MAX_TERMS_TO_INDEX = 150;
 const ALLOWED_EXTENSIONS = [".pdf", ".pptx", ".docx", ".txt", ".md"];
 const ALLOWED_MIME_TYPES = [
   "application/pdf",

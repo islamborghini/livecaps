@@ -86,19 +86,17 @@ function generateVectorId(sessionId: string, term: ExtractedTerm): string {
 
 /**
  * Convert ExtractedTerm to vector record metadata
+ * Optimized: Only essential fields to reduce token usage
  */
 function termToMetadata(sessionId: string, term: ExtractedTerm): Record<string, string | number | boolean> {
   return {
     sessionId,
     term: term.term,
     normalizedTerm: term.normalizedTerm,
-    context: term.context.substring(0, 1000), // Limit context size
-    sourceFile: term.sourceFile,
+    context: term.context.substring(0, 80), // Reduced from 1000 to save tokens
     phoneticCode: term.phoneticCode,
-    frequency: term.frequency,
     isProperNoun: term.isProperNoun,
     category: term.category || "general",
-    indexedAt: Date.now(),
   };
 }
 
@@ -155,7 +153,7 @@ export async function indexSessionContent(
   for (let i = 0; i < terms.length; i += cfg.indexBatchSize) {
     const batchNum = Math.floor(i / cfg.indexBatchSize) + 1;
     const batch = terms.slice(i, i + cfg.indexBatchSize);
-    const batchTexts = batch.map(t => `${t.term}: ${t.context.substring(0, 200)}`);
+    const batchTexts = batch.map(t => `${t.term}: ${t.context.substring(0, 80)}`);
 
     // Report progress
     onProgress?.({
