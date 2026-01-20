@@ -12,6 +12,7 @@
 
 import mammoth from "mammoth";
 import { extractText } from "unpdf";
+import JSZip from "jszip";
 import {
   ExtractedTerm,
   UploadedContent,
@@ -74,32 +75,61 @@ async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
 }
 
 /**
- * Extract text from a PPTX file buffer
- * Note: mammoth doesn't support PPTX natively, so we use a simplified approach
- * For full PPTX support, consider using a dedicated library like pptx-parser
+ * Extract text from a PPTX file buffer using JSZip
+ * PPTX files are ZIP archives containing XML files with slide content
  */
 async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
   try {
-    // PPTX files are ZIP archives containing XML files
-    // We'll use mammoth which can handle some Office formats
-    // For a more robust solution, consider using JSZip + xml parsing
-    const result = await mammoth.extractRawText({ buffer });
-    if (result.value) {
-      return result.value;
+    // Convert Buffer to Uint8Array for JSZip compatibility
+    const uint8Array = new Uint8Array(buffer);
+    const zip = await JSZip.loadAsync(uint8Array);
+    const textParts: string[] = [];
+    
+    // Get all slide XML files (ppt/slides/slide1.xml, slide2.xml, etc.)
+    const slideFiles = Object.keys(zip.files)
+      .filter(name => name.match(/^ppt\/slides\/slide\d+\.xml$/))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)/)?.[1] || "0");
+        const numB = parseInt(b.match(/slide(\d+)/)?.[1] || "0");
+        return numA - numB;
+      });
+    
+    for (const slideFile of slideFiles) {
+      const content = await zip.files[slideFile].async("text");
+      // Extract text from XML - look for <a:t> tags (text runs)
+      const textMatches = content.match(/<a:t>([^<]*)<\/a:t>/g);
+      if (textMatches) {
+        const slideText = textMatches
+          .map(match => match.replace(/<\/?a:t>/g, "").trim())
+          .filter(text => text.length > 0)
+          .join(" ");
+        if (slideText) {
+          textParts.push(slideText);
+        }
+      }
     }
     
-    // Fallback: try to extract any readable text
-    const textContent = buffer.toString("utf-8");
-    // Extract text between XML tags (simplified approach)
-    const textMatches = textContent.match(/>([^<>]+)</g);
-    if (textMatches) {
-      return textMatches
-        .map(match => match.slice(1, -1).trim())
-        .filter(text => text.length > 2 && !/^[\d\s]+$/.test(text))
-        .join(" ");
+    // Also check notes slides for speaker notes
+    const notesFiles = Object.keys(zip.files)
+      .filter(name => name.match(/^ppt\/notesSlides\/notesSlide\d+\.xml$/));
+    
+    for (const notesFile of notesFiles) {
+      const content = await zip.files[notesFile].async("text");
+      const textMatches = content.match(/<a:t>([^<]*)<\/a:t>/g);
+      if (textMatches) {
+        const notesText = textMatches
+          .map(match => match.replace(/<\/?a:t>/g, "").trim())
+          .filter(text => text.length > 0)
+          .join(" ");
+        if (notesText) {
+          textParts.push(notesText);
+        }
+      }
     }
     
-    return "";
+    const result = textParts.join("\n\n");
+    console.log(`📊 PPTX: Extracted ${result.length} chars from ${slideFiles.length} slides`);
+    return result;
   } catch (error) {
     console.error("❌ PPTX parsing error:", error);
     throw new Error(`Failed to parse PPTX: ${error instanceof Error ? error.message : "Unknown error"}`);

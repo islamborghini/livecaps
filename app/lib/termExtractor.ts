@@ -129,7 +129,33 @@ export function splitIntoSentences(text: string): string[] {
 }
 
 /**
- * Get surrounding context for a term (2-3 sentences)
+ * Get surrounding context for a term using pre-built index
+ */
+export function getTermContextFast(
+  term: string,
+  sentenceIndex: Map<string, number[]>,
+  sentences: string[],
+  maxSentences: number = 2
+): string {
+  const termLower = term.toLowerCase();
+  const matchingIndices = sentenceIndex.get(termLower);
+  
+  if (matchingIndices && matchingIndices.length > 0) {
+    const matchingSentences: string[] = [];
+    const firstIdx = matchingIndices[0];
+    matchingSentences.push(sentences[firstIdx]);
+    if (matchingSentences.length < maxSentences && firstIdx + 1 < sentences.length) {
+      matchingSentences.push(sentences[firstIdx + 1]);
+    }
+    return matchingSentences.join(" ").trim();
+  }
+  
+  // Fallback for phrases not in index - just return first 100 chars of term location
+  return term;
+}
+
+/**
+ * Get surrounding context for a term (2-3 sentences) - legacy
  */
 export function getTermContext(
   sentences: string[],
@@ -314,6 +340,7 @@ export function categorizeTerm(
  */
 export function extractProperNounPhrases(text: string): string[] {
   const phrases: string[] = [];
+  const MAX_PHRASES = 200; // Limit to prevent slow processing
 
   // Match sequences of capitalized words (2-4 words)
   const patterns = [
@@ -325,13 +352,14 @@ export function extractProperNounPhrases(text: string): string[] {
 
   for (const pattern of patterns) {
     let match;
-    while ((match = pattern.exec(text)) !== null) {
+    while ((match = pattern.exec(text)) !== null && phrases.length < MAX_PHRASES) {
       const phrase = match[1];
       // Filter out common phrases that aren't proper nouns
       if (!isCommonPhrase(phrase)) {
         phrases.push(phrase);
       }
     }
+    if (phrases.length >= MAX_PHRASES) break;
   }
 
   return [...new Set(phrases)];
@@ -368,7 +396,22 @@ export function extractTerms(
 
   // Split text into sentences for context extraction
   const sentences = splitIntoSentences(text);
-  const fullText = sentences.join(" ");
+
+  // Build word-to-sentence index for O(1) context lookup
+  const sentenceIndex = new Map<string, number[]>();
+  for (let i = 0; i < sentences.length; i++) {
+    const sentenceWords = sentences[i].toLowerCase().split(/\s+/);
+    for (const word of sentenceWords) {
+      const cleanWord = word.replace(/[^a-z0-9'-]/g, "");
+      if (cleanWord.length >= 2) {
+        const indices = sentenceIndex.get(cleanWord) || [];
+        if (!indices.includes(i)) {
+          indices.push(i);
+          sentenceIndex.set(cleanWord, indices);
+        }
+      }
+    }
+  }
 
   // Extract sentence starters (to identify proper nouns correctly)
   const sentenceStarters = new Set<string>();
@@ -423,7 +466,7 @@ export function extractTerms(
     }
 
     if (shouldExtract) {
-      const context = getTermContext(sentences, word, cfg.maxContextSentences);
+      const context = getTermContextFast(word, sentenceIndex, sentences, cfg.maxContextSentences);
 
       // Refine category based on context if not already specific
       if (category === "general" || !["acronym", "technical"].includes(category)) {
@@ -446,7 +489,7 @@ export function extractTerms(
     }
   }
 
-  // Extract multi-word phrases
+  // Extract multi-word phrases (limit to prevent slowness)
   if (cfg.extractPhrases) {
     const phrases = extractProperNounPhrases(text);
 
@@ -459,9 +502,16 @@ export function extractTerms(
       const wordCount = phrase.split(/\s+/).length;
       if (wordCount > cfg.maxPhraseLength) continue;
 
-      const context = getTermContext(sentences, phrase, cfg.maxContextSentences);
+      // Use fast context lookup - for phrases, use first word
+      const firstWord = phrase.split(/\s+/)[0]?.toLowerCase();
+      const context = firstWord 
+        ? getTermContextFast(firstWord, sentenceIndex, sentences, cfg.maxContextSentences)
+        : phrase;
       const category = categorizeTerm(phrase, context);
-      const frequency = (text.match(new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi")) || []).length;
+      // Estimate frequency based on word frequencies (fast)
+      const phraseWords = normalizedPhrase.split(/\s+/);
+      const minWordFreq = Math.min(...phraseWords.map(w => wordFrequencies.get(w) || 1));
+      const frequency = Math.max(1, Math.floor(minWordFreq / 2));
 
       const extractedTerm: ExtractedTerm = {
         term: phrase,

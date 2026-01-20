@@ -37,6 +37,8 @@ import { translateBySentences, cacheUtils } from "../services/translationService
 import MultiLanguageSelector from "./MultiLanguageSelector";
 import TranscriptionModeToggle from "./TranscriptionModeToggle";
 import RAGUpload from "./RAGUpload";
+import { useRAG } from "@/app/hooks/useRAG";
+import { WordConfidence } from "@/app/types/rag";
 import { TranscriptionMode, WinnerTranscript } from "../types/multiDeepgram";
 
 /**
@@ -140,6 +142,17 @@ const App: () => JSX.Element = () => {
   const { setupMicrophone, microphone, startMicrophone, microphoneState, errorMessage, retrySetup } =
     useMicrophone();
 
+  // RAG integration for vocabulary-aware transcript correction
+  const {
+    isReady: isRAGReady,
+    sessionId: ragSessionId,
+    correct: ragCorrect,
+    shouldTriggerRAG,
+  } = useRAG({ debug: false });
+
+  // Track blocks that are pending RAG correction to avoid duplicate corrections
+  const pendingRAGCorrections = useRef<Set<string>>(new Set());
+
   // Refs for managing transcription flow
   const keepAliveInterval = useRef<any>();
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
@@ -148,6 +161,8 @@ const App: () => JSX.Element = () => {
   // Buffer now tracks language metadata for multilingual code-switching support
   const currentSentenceBuffer = useRef<TranscriptSegment>({ text: "", languages: [] });
   const bufferTimeout = useRef<NodeJS.Timeout | null>(null); // Timeout for processing buffered text
+  // Store word confidences from latest Deepgram response for RAG correction
+  const lastWordConfidences = useRef<WordConfidence[]>([]);
 
   // Translation queue management - updated to work with TranscriptBlocks
   const translationQueue = useRef<{
@@ -157,6 +172,9 @@ const App: () => JSX.Element = () => {
     targetLanguage: string;              // Target translation language
   }[]>([]);
   const isProcessingTranslation = useRef<boolean>(false);
+
+  // Ref to store queueTranslation function for use in callbacks
+  const queueTranslationRef = useRef<(blockId: string, text: string, targetLanguage: string) => void>(() => {});
 
   /**
    * Detect the dominant (most frequent) language from detected languages array.
@@ -277,6 +295,12 @@ const App: () => JSX.Element = () => {
         sessionLanguages.display.forEach(targetLang => {
           queueTranslation(block.id, block.original.text, targetLang);
         });
+
+        // Apply RAG correction asynchronously (non-blocking)
+        if (isRAGReady) {
+          const dominantLang = detectDominantLanguage(bufferedLanguages);
+          applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
+        }
 
         console.log(`📦 Flushed buffer (${textToProcess.length} chars, ${wordCount} words): "${textToProcess.substring(0, 50)}..."`);
       } else {
@@ -675,6 +699,88 @@ const App: () => JSX.Element = () => {
   };
 
   /**
+   * Apply RAG correction to a transcript block asynchronously.
+   * Shows original text immediately, updates if correction is different.
+   * Re-queues translations if text was modified.
+   * 
+   * @param blockId - ID of the TranscriptBlock to correct
+   * @param originalText - Original transcript text
+   * @param wordConfidences - Optional word-level confidence scores from Deepgram
+   * @param language - Detected language of the transcript
+   */
+  const applyRAGCorrection = useCallback(async (
+    blockId: string,
+    originalText: string,
+    wordConfidences: WordConfidence[] | undefined,
+    language: string
+  ) => {
+    // Skip if RAG not ready or already processing this block
+    if (!isRAGReady || pendingRAGCorrections.current.has(blockId)) {
+      return;
+    }
+
+    // Check if correction is needed (based on confidence or always for RAG)
+    // If no word confidences provided, generate low-confidence ones to trigger correction
+    const confidences = wordConfidences || originalText.split(/\s+/).map((word, i) => ({
+      word,
+      confidence: 0.6, // Below threshold to trigger RAG
+      start: i * 0.5,
+      end: (i + 1) * 0.5,
+    }));
+
+    // Check if any words need correction
+    if (!shouldTriggerRAG(confidences, 0.7)) {
+      console.log(`✅ RAG: All words high confidence, skipping correction for block ${blockId}`);
+      return;
+    }
+
+    pendingRAGCorrections.current.add(blockId);
+    console.log(`🔍 RAG: Correcting block ${blockId}: "${originalText.substring(0, 50)}..."`);
+
+    try {
+      const result = await ragCorrect(originalText, confidences, {
+        language,
+        isFinal: true,
+      });
+
+      // Check if correction changed the text
+      if (result.wasModified && result.correctedTranscript !== originalText) {
+        console.log(`✨ RAG: Correction applied to block ${blockId}`);
+        console.log(`   Original: "${originalText.substring(0, 60)}..."`);
+        console.log(`   Corrected: "${result.correctedTranscript.substring(0, 60)}..."`);
+        console.log(`   Corrections:`, result.corrections);
+
+        // Update the block with corrected text
+        setTranscriptBlocks(prev => prev.map(block => {
+          if (block.id === blockId) {
+            return {
+              ...block,
+              original: {
+                ...block.original,
+                text: result.correctedTranscript,
+              },
+              // Reset translations to null so they get re-queued
+              translations: block.translations.map(t => ({ ...t, text: null })),
+            };
+          }
+          return block;
+        }));
+
+        // Re-queue translations with corrected text
+        sessionLanguages.display.forEach(targetLang => {
+          queueTranslationRef.current(blockId, result.correctedTranscript, targetLang);
+        });
+      } else {
+        console.log(`📝 RAG: No changes needed for block ${blockId}`);
+      }
+    } catch (error) {
+      console.error(`❌ RAG: Correction failed for block ${blockId}:`, error);
+    } finally {
+      pendingRAGCorrections.current.delete(blockId);
+    }
+  }, [isRAGReady, ragCorrect, shouldTriggerRAG, sessionLanguages.display]);
+
+  /**
    * Handles winner transcript from multi-language detection mode
    * Processes the winning transcript similar to single-mode transcript handling
    */
@@ -737,6 +843,13 @@ const App: () => JSX.Element = () => {
         sessionLanguages.display.forEach(targetLang => {
           queueTranslation(block.id, block.original.text, targetLang);
         });
+
+        // Apply RAG correction asynchronously (non-blocking)
+        // Uses word confidences from the winner transcript if available
+        if (isRAGReady) {
+          const dominantLang = detectDominantLanguage(combinedLanguages);
+          applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
+        }
       });
 
       // Update buffer with remaining text
@@ -777,6 +890,12 @@ const App: () => JSX.Element = () => {
             queueTranslation(block.id, block.original.text, targetLang);
           });
 
+          // Apply RAG correction asynchronously (non-blocking)
+          if (isRAGReady) {
+            const dominantLang = detectDominantLanguage(bufferedLanguages);
+            applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
+          }
+
           currentSentenceBuffer.current = { text: "", languages: [] };
           console.log(`📦 Timeout flush (${finalText.length} chars, ${wordCount} words)`);
         } else if (bufferedText.length > 0) {
@@ -787,13 +906,14 @@ const App: () => JSX.Element = () => {
 
     // Clear interim text
     setCurrentInterimText("");
-  }, [sessionLanguages, detectCompleteSentences, createTranscriptBlock]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLanguages, detectCompleteSentences, createTranscriptBlock, isRAGReady, applyRAGCorrection, detectDominantLanguage]);
 
   /**
    * Add translation to queue (non-blocking).
    * Updated to work with TranscriptBlocks - queues a single text for translation.
    */
-  const queueTranslation = (blockId: string, text: string, targetLanguage: string) => {
+  const queueTranslation = useCallback((blockId: string, text: string, targetLanguage: string) => {
     // Create a unique key for this translation request
     const requestKey = `${blockId}-${targetLanguage}`;
 
@@ -815,7 +935,13 @@ const App: () => JSX.Element = () => {
 
     // Start processing queue asynchronously (fire and forget)
     setTimeout(() => processTranslationQueue(), 0);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep queueTranslationRef updated
+  useEffect(() => {
+    queueTranslationRef.current = queueTranslation;
+  }, [queueTranslation]);
 
   useEffect(() => {
     if (!microphone) return;
@@ -833,12 +959,9 @@ const App: () => JSX.Element = () => {
             // Single mode - send to single connection
             singleContext.connection?.send(e.data);
           }
-          console.log('🎤 Audio chunk sent:', e.data.size, 'bytes');
         } catch (error) {
           console.warn('⚠️ Failed to send audio data:', error);
         }
-      } else {
-        console.log('⚠️ Not sending audio - size:', e.data.size, 'state:', connectionState);
       }
     };
 
@@ -847,10 +970,7 @@ const App: () => JSX.Element = () => {
       const alternative = data.channel.alternatives[0];
       let thisCaption = alternative.transcript.trim();
 
-      console.log(`📡 Transcript received - isFinal: ${isFinal}, text: "${thisCaption}"`);
-
       if (thisCaption === "") {
-        console.log('⚠️ Empty transcript, ignoring');
         return;
       }
       
@@ -858,6 +978,16 @@ const App: () => JSX.Element = () => {
       // Each word can have a different language when code-switching occurs
       const words = (alternative as any).words || [];
       const detectedLanguages: string[] = [];
+
+      // Store word confidences for RAG correction
+      if (isFinal && words.length > 0) {
+        lastWordConfidences.current = words.map((w: any) => ({
+          word: w.word || "",
+          confidence: w.confidence || 0.5,
+          start: w.start || 0,
+          end: w.end || 0,
+        }));
+      }
 
       // Debug: Log the full alternative object to see what we're getting
       if (isFinal) {
@@ -936,10 +1066,18 @@ const App: () => JSX.Element = () => {
           setTranscriptBlocks(prev => [...prev, ...newBlocks]);
 
           // Queue translations for all display languages for each block
+          // Also apply RAG correction asynchronously if ready
           newBlocks.forEach(block => {
             sessionLanguages.display.forEach(targetLang => {
               queueTranslation(block.id, block.original.text, targetLang);
             });
+
+            // Apply RAG correction asynchronously (non-blocking)
+            // Pass word confidences from Deepgram for accurate correction targeting
+            if (isRAGReady) {
+              const dominantLang = detectDominantLanguage(combinedLanguages);
+              applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
+            }
           });
 
           // Keep any remaining text in buffer (preserving languages for next segment)

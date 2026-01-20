@@ -53,8 +53,8 @@ export interface EmbeddingsConfig {
 export const DEFAULT_EMBEDDINGS_CONFIG: EmbeddingsConfig = {
   apiKey: process.env.JINA_API_KEY || "",
   model: "jina-embeddings-v3",
-  maxBatchSize: 100, // Jina allows up to 2048, but we'll be conservative
-  requestDelayMs: 100, // 100ms between requests
+  maxBatchSize: 150, // Process all 150 terms in one batch for speed
+  requestDelayMs: 25, // Minimal delay (was 100ms)
   maxRetries: 3,
   retryDelayMs: 1000,
   useFallback: true,

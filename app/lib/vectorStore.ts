@@ -47,7 +47,7 @@ export const DEFAULT_VECTOR_STORE_CONFIG: VectorStoreConfig = {
   semanticWeight: 0.6,
   phoneticWeight: 0.4,
   minSimilarity: 0.5,
-  indexBatchSize: 50,
+  indexBatchSize: 150, // Process all terms in single batch for speed
 };
 
 /**

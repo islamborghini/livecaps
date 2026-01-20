@@ -98,13 +98,20 @@ export async function POST(request: NextRequest) {
           type: "progress", 
           stage: "validating", 
           progress: 5, 
-          message: "5% done" 
+          message: "Validating file..." 
         });
 
         // Parse multipart form data
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
         const customSessionId = formData.get("sessionId") as string | null;
+
+        sendProgress({ 
+          type: "progress", 
+          stage: "validating", 
+          progress: 8, 
+          message: "File received..." 
+        });
 
         if (!file) {
           sendProgress({ type: "error", message: "No file provided" });
@@ -138,7 +145,7 @@ export async function POST(request: NextRequest) {
           type: "progress", 
           stage: "parsing", 
           progress: 10, 
-          message: "10% done" 
+          message: "Reading file..." 
         });
 
         // Get or create session ID
@@ -149,8 +156,22 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Parse document
-        const parsedContent = await parseDocument(buffer, mimeType, file.name);
+        sendProgress({ 
+          type: "progress", 
+          stage: "parsing", 
+          progress: 15, 
+          message: "Parsing document..." 
+        });
+
+        // Parse document (args: buffer, fileName, mimeType)
+        const parsedContent = await parseDocument(buffer, file.name, mimeType);
+
+        sendProgress({ 
+          type: "progress", 
+          stage: "parsing", 
+          progress: 20, 
+          message: "Document parsed!" 
+        });
 
         // Check if document has actual text content (trim whitespace)
         const trimmedText = (parsedContent.rawText || "").trim();
@@ -219,6 +240,8 @@ export async function POST(request: NextRequest) {
         const categoryBreakdown: Record<string, number> = {};
         const sampleTerms: Record<string, string[]> = {};
         
+        console.log(`📝 Building sample terms from ${terms.length} terms...`);
+        
         for (const term of terms) {
           const category = term.category || "other";
           categoryBreakdown[category] = (categoryBreakdown[category] || 0) + 1;
@@ -229,6 +252,9 @@ export async function POST(request: NextRequest) {
             sampleTerms[category].push(term.term);
           }
         }
+        
+        console.log(`📊 Sample terms:`, JSON.stringify(sampleTerms, null, 2));
+        console.log(`📊 Categories:`, JSON.stringify(categoryBreakdown, null, 2));
 
         const processingTimeMs = Date.now() - startTime;
 
@@ -276,8 +302,10 @@ export async function POST(request: NextRequest) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
+      "X-Accel-Buffering": "no", // Disable nginx buffering
+      "Transfer-Encoding": "chunked",
     },
   });
 }
