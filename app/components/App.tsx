@@ -36,6 +36,9 @@ import Visualizer from "./Visualizer";
 import { translateBySentences, cacheUtils } from "../services/translationService";
 import MultiLanguageSelector from "./MultiLanguageSelector";
 import TranscriptionModeToggle from "./TranscriptionModeToggle";
+import RAGUpload, { UploadedFile } from "./RAGUpload";
+import { useRAG } from "@/app/hooks/useRAG";
+import { WordConfidence } from "@/app/types/rag";
 import { TranscriptionMode, WinnerTranscript } from "../types/multiDeepgram";
 
 /**
@@ -71,13 +74,18 @@ type SessionLanguages = {
 type TranscriptBlock = {
   id: string;  // Unique identifier for this block
   original: {
-    text: string;      // The original transcribed text
+    text: string;      // The original transcribed text (may be corrected)
     language: string;  // Dominant language detected (e.g., "en", "ko")
   };
   translations: {
     language: string;  // Target language code (e.g., "es", "ja")
     text: string | null;  // Translated text (null while pending)
   }[];
+  // RAG correction metadata (optional - only present if correction was applied)
+  ragCorrected?: {
+    originalText: string;      // The original misheard text before correction
+    correctedTerms: string[];  // List of terms that were corrected
+  };
 };
 
 const App: () => JSX.Element = () => {
@@ -94,6 +102,9 @@ const App: () => JSX.Element = () => {
 
   // Transcription mode - single language or multi-language detection
   const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("single");
+  
+  // RAG correction toggle - allows users to enable/disable vocabulary corrections
+  const [isRAGEnabled, setIsRAGEnabled] = useState<boolean>(true);
 
   // Load from localStorage after mount (client-side only)
   useEffect(() => {
@@ -139,6 +150,20 @@ const App: () => JSX.Element = () => {
   const { setupMicrophone, microphone, startMicrophone, microphoneState, errorMessage, retrySetup } =
     useMicrophone();
 
+  // RAG integration for vocabulary-aware transcript correction
+  const {
+    isReady: isRAGReady,
+    sessionId: ragSessionId,
+    correct: ragCorrect,
+    shouldTriggerRAG,
+  } = useRAG({ debug: false });
+
+  // Uploaded files state - lifted from RAGUpload to persist across fullscreen toggle
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+
+  // Track blocks that are pending RAG correction to avoid duplicate corrections
+  const pendingRAGCorrections = useRef<Set<string>>(new Set());
+
   // Refs for managing transcription flow
   const keepAliveInterval = useRef<any>();
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
@@ -147,6 +172,8 @@ const App: () => JSX.Element = () => {
   // Buffer now tracks language metadata for multilingual code-switching support
   const currentSentenceBuffer = useRef<TranscriptSegment>({ text: "", languages: [] });
   const bufferTimeout = useRef<NodeJS.Timeout | null>(null); // Timeout for processing buffered text
+  // Store word confidences from latest Deepgram response for RAG correction
+  const lastWordConfidences = useRef<WordConfidence[]>([]);
 
   // Translation queue management - updated to work with TranscriptBlocks
   const translationQueue = useRef<{
@@ -156,6 +183,9 @@ const App: () => JSX.Element = () => {
     targetLanguage: string;              // Target translation language
   }[]>([]);
   const isProcessingTranslation = useRef<boolean>(false);
+
+  // Ref to store queueTranslation function for use in callbacks
+  const queueTranslationRef = useRef<(blockId: string, text: string, targetLanguage: string) => void>(() => {});
 
   /**
    * Detect the dominant (most frequent) language from detected languages array.
@@ -276,6 +306,12 @@ const App: () => JSX.Element = () => {
         sessionLanguages.display.forEach(targetLang => {
           queueTranslation(block.id, block.original.text, targetLang);
         });
+
+        // Apply RAG correction asynchronously (non-blocking)
+        if (isRAGReady) {
+          const dominantLang = detectDominantLanguage(bufferedLanguages);
+          applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
+        }
 
         console.log(`📦 Flushed buffer (${textToProcess.length} chars, ${wordCount} words): "${textToProcess.substring(0, 50)}..."`);
       } else {
@@ -674,6 +710,96 @@ const App: () => JSX.Element = () => {
   };
 
   /**
+   * Apply RAG correction to a transcript block asynchronously.
+   * Shows original text immediately, updates if correction is different.
+   * Re-queues translations if text was modified.
+   * 
+   * @param blockId - ID of the TranscriptBlock to correct
+   * @param originalText - Original transcript text
+   * @param wordConfidences - Optional word-level confidence scores from Deepgram
+   * @param language - Detected language of the transcript
+   */
+  const applyRAGCorrection = useCallback(async (
+    blockId: string,
+    originalText: string,
+    wordConfidences: WordConfidence[] | undefined,
+    language: string
+  ) => {
+    // Skip if RAG not ready, disabled, or already processing this block
+    if (!isRAGReady || !isRAGEnabled || pendingRAGCorrections.current.has(blockId)) {
+      return;
+    }
+
+    // Check if correction is needed (based on confidence or always for RAG)
+    // If no word confidences provided, generate low-confidence ones to trigger correction
+    const confidences = wordConfidences || originalText.split(/\s+/).map((word, i) => ({
+      word,
+      confidence: 0.6, // Below threshold to trigger RAG
+      start: i * 0.5,
+      end: (i + 1) * 0.5,
+    }));
+
+    // Check if any words need correction
+    if (!shouldTriggerRAG(confidences, 0.7)) {
+      console.log(`✅ RAG: All words high confidence, skipping correction for block ${blockId}`);
+      return;
+    }
+
+    pendingRAGCorrections.current.add(blockId);
+    console.log(`🔍 RAG: Correcting block ${blockId}: "${originalText.substring(0, 50)}..."`);
+
+    try {
+      const result = await ragCorrect(originalText, confidences, {
+        language,
+        isFinal: true,
+      });
+
+      // Check if correction changed the text
+      if (result.wasModified && result.correctedTranscript !== originalText) {
+        console.log(`✨ RAG: Correction applied to block ${blockId}`);
+        console.log(`   Original: "${originalText.substring(0, 60)}..."`);
+        console.log(`   Corrected: "${result.correctedTranscript.substring(0, 60)}..."`);
+        console.log(`   Corrections:`, result.corrections);
+
+        // Extract corrected terms from the corrections array
+        const correctedTerms = result.corrections.map(c => c.corrected);
+
+        // Update the block with corrected text AND store original for hover display
+        setTranscriptBlocks(prev => prev.map(block => {
+          if (block.id === blockId) {
+            return {
+              ...block,
+              original: {
+                ...block.original,
+                text: result.correctedTranscript,
+              },
+              // Store RAG correction metadata
+              ragCorrected: {
+                originalText: originalText,
+                correctedTerms: correctedTerms,
+              },
+              // Reset translations to null so they get re-queued
+              translations: block.translations.map(t => ({ ...t, text: null })),
+            };
+          }
+          return block;
+        }));
+
+        // Re-queue translations with corrected text
+        sessionLanguages.display.forEach(targetLang => {
+          queueTranslationRef.current(blockId, result.correctedTranscript, targetLang);
+        });
+      } else {
+        console.log(`📝 RAG: No changes needed for block ${blockId}`);
+      }
+    } catch (error) {
+      console.error(`❌ RAG: Correction failed for block ${blockId}:`, error);
+    } finally {
+      pendingRAGCorrections.current.delete(blockId);
+    }
+  }, [isRAGReady, isRAGEnabled, ragCorrect, shouldTriggerRAG, sessionLanguages.display]);
+
+  /**
    * Handles winner transcript from multi-language detection mode
    * Processes the winning transcript similar to single-mode transcript handling
    */
@@ -736,6 +862,13 @@ const App: () => JSX.Element = () => {
         sessionLanguages.display.forEach(targetLang => {
           queueTranslation(block.id, block.original.text, targetLang);
         });
+
+        // Apply RAG correction asynchronously (non-blocking)
+        // Uses word confidences from the winner transcript if available
+        if (isRAGReady) {
+          const dominantLang = detectDominantLanguage(combinedLanguages);
+          applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
+        }
       });
 
       // Update buffer with remaining text
@@ -776,6 +909,12 @@ const App: () => JSX.Element = () => {
             queueTranslation(block.id, block.original.text, targetLang);
           });
 
+          // Apply RAG correction asynchronously (non-blocking)
+          if (isRAGReady) {
+            const dominantLang = detectDominantLanguage(bufferedLanguages);
+            applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
+          }
+
           currentSentenceBuffer.current = { text: "", languages: [] };
           console.log(`📦 Timeout flush (${finalText.length} chars, ${wordCount} words)`);
         } else if (bufferedText.length > 0) {
@@ -786,13 +925,14 @@ const App: () => JSX.Element = () => {
 
     // Clear interim text
     setCurrentInterimText("");
-  }, [sessionLanguages, detectCompleteSentences, createTranscriptBlock]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLanguages, detectCompleteSentences, createTranscriptBlock, isRAGReady, applyRAGCorrection, detectDominantLanguage]);
 
   /**
    * Add translation to queue (non-blocking).
    * Updated to work with TranscriptBlocks - queues a single text for translation.
    */
-  const queueTranslation = (blockId: string, text: string, targetLanguage: string) => {
+  const queueTranslation = useCallback((blockId: string, text: string, targetLanguage: string) => {
     // Create a unique key for this translation request
     const requestKey = `${blockId}-${targetLanguage}`;
 
@@ -814,7 +954,13 @@ const App: () => JSX.Element = () => {
 
     // Start processing queue asynchronously (fire and forget)
     setTimeout(() => processTranslationQueue(), 0);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep queueTranslationRef updated
+  useEffect(() => {
+    queueTranslationRef.current = queueTranslation;
+  }, [queueTranslation]);
 
   useEffect(() => {
     if (!microphone) return;
@@ -832,12 +978,9 @@ const App: () => JSX.Element = () => {
             // Single mode - send to single connection
             singleContext.connection?.send(e.data);
           }
-          console.log('🎤 Audio chunk sent:', e.data.size, 'bytes');
         } catch (error) {
           console.warn('⚠️ Failed to send audio data:', error);
         }
-      } else {
-        console.log('⚠️ Not sending audio - size:', e.data.size, 'state:', connectionState);
       }
     };
 
@@ -846,10 +989,7 @@ const App: () => JSX.Element = () => {
       const alternative = data.channel.alternatives[0];
       let thisCaption = alternative.transcript.trim();
 
-      console.log(`📡 Transcript received - isFinal: ${isFinal}, text: "${thisCaption}"`);
-
       if (thisCaption === "") {
-        console.log('⚠️ Empty transcript, ignoring');
         return;
       }
       
@@ -857,6 +997,16 @@ const App: () => JSX.Element = () => {
       // Each word can have a different language when code-switching occurs
       const words = (alternative as any).words || [];
       const detectedLanguages: string[] = [];
+
+      // Store word confidences for RAG correction
+      if (isFinal && words.length > 0) {
+        lastWordConfidences.current = words.map((w: any) => ({
+          word: w.word || "",
+          confidence: w.confidence || 0.5,
+          start: w.start || 0,
+          end: w.end || 0,
+        }));
+      }
 
       // Debug: Log the full alternative object to see what we're getting
       if (isFinal) {
@@ -935,10 +1085,18 @@ const App: () => JSX.Element = () => {
           setTranscriptBlocks(prev => [...prev, ...newBlocks]);
 
           // Queue translations for all display languages for each block
+          // Also apply RAG correction asynchronously if ready
           newBlocks.forEach(block => {
             sessionLanguages.display.forEach(targetLang => {
               queueTranslation(block.id, block.original.text, targetLang);
             });
+
+            // Apply RAG correction asynchronously (non-blocking)
+            // Pass word confidences from Deepgram for accurate correction targeting
+            if (isRAGReady) {
+              const dominantLang = detectDominantLanguage(combinedLanguages);
+              applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
+            }
           });
 
           // Keep any remaining text in buffer (preserving languages for next segment)
@@ -1100,16 +1258,57 @@ const App: () => JSX.Element = () => {
   /**
    * Render a single TranscriptBlock with original text and translations.
    * Supports both light and dark mode.
+   * Shows RAG correction indicator if vocabulary correction was applied.
    */
   const renderTranscriptBlock = (block: TranscriptBlock) => {
+    // Debug: log when rendering blocks
+    console.log(`🎨 Rendering block: ${block.id}, text: "${block.original.text.substring(0, 30)}...", ragCorrected: ${!!block.ragCorrected}`);
+    
     return (
       <div key={block.id} className="mb-6 border-l-2 border-[#0D9488] pl-4 hover:border-[#14B8A6] transition-colors duration-200">
         {/* Original text - smaller, muted */}
-        <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-          <span className="font-mono text-xs uppercase tracking-wide mr-2 text-[#0D9488]">
-            [{block.original.language}]
-          </span>
-          {block.original.text}
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 flex items-start gap-2">
+          <div className="flex-1">
+            <span className="font-mono text-xs uppercase tracking-wide mr-2 text-[#0D9488]">
+              [{block.original.language}]
+            </span>
+            {block.original.text}
+          </div>
+          
+          {/* RAG Correction Indicator */}
+          {block.ragCorrected && (
+            <div className="group relative flex-shrink-0">
+              <span 
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 cursor-help"
+                title="Vocabulary correction applied"
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.061l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.061 1.06l1.06 1.06z" />
+                </svg>
+                ✨
+              </span>
+              
+              {/* Hover tooltip showing original text */}
+              <div className="absolute right-0 top-full mt-1 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+                <div className="bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg p-3 max-w-xs whitespace-normal border border-gray-700">
+                  <div className="font-medium text-amber-400 mb-1">Original (before correction):</div>
+                  <div className="text-gray-300 italic">&quot;{block.ragCorrected.originalText}&quot;</div>
+                  {block.ragCorrected.correctedTerms.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-700">
+                      <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">Corrected terms:</div>
+                      <div className="flex flex-wrap gap-1">
+                        {block.ragCorrected.correctedTerms.map((term, i) => (
+                          <span key={i} className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px]">
+                            {term}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Translations - larger, more prominent */}
@@ -1176,15 +1375,20 @@ const App: () => JSX.Element = () => {
               )}
             </div>
 
-            <button
-              onClick={() => setIsFullscreen(false)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Exit Fullscreen
-            </button>
+            <div className="flex items-center gap-3">
+              {/* RAG Upload - Compact Mode in Fullscreen */}
+              <RAGUpload compact uploadedFiles={uploadedFiles} setUploadedFiles={setUploadedFiles} isRAGEnabled={isRAGEnabled} setIsRAGEnabled={setIsRAGEnabled} />
+
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Exit Fullscreen
+              </button>
+            </div>
           </div>
 
           {/* Unified Transcript - Fullscreen */}
@@ -1252,6 +1456,9 @@ const App: () => JSX.Element = () => {
                     </button>
                   )}
                 </div>
+
+                {/* RAG Upload - Compact Mode */}
+                <RAGUpload compact uploadedFiles={uploadedFiles} setUploadedFiles={setUploadedFiles} isRAGEnabled={isRAGEnabled} setIsRAGEnabled={setIsRAGEnabled} />
 
                 <button
                   onClick={() => setIsFullscreen(true)}
