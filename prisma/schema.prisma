@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Tier {
+  FREE
+  PAID
+  PRO
+}
+
+model User {
+  id               String        @id @default(cuid())
+  email            String        @unique
+  passwordHash     String
+  name             String
+  tier             Tier          @default(FREE)
+  stripeCustomerId String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  usageRecords     UsageRecord[]
+  sessions         Session[]
+}
+
+model UsageRecord {
+  id           String   @id @default(cuid())
+  userId       String
+  date         String   // "YYYY-MM-DD" UTC -- one record per user per day
+  secondsUsed  Int      @default(0)
+  lastSyncedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  userId         String
+  durationSeconds Int     @default(0)
+  spokenLanguages String[] @default([])
+  displayLanguages String[] @default([])
+  createdAt      DateTime @default(now())
+  endedAt        DateTime?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

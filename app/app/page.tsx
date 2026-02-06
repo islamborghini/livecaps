@@ -1,24 +1,20 @@
-/**
- * LiveCaps Application Page
- * 
- * Main application page that houses the real-time speech transcription and translation functionality.
- * This is where users access the core features of LiveCaps after landing on the homepage.
- * 
- * Features:
- * - Real-time speech-to-text transcription using Deepgram
- * - Live translation to multiple target languages
- * - Smart sentence detection and paragraph formatting
- * - Audio visualization with microphone input levels
- * - Dual-panel layout showing original transcription and translated text
- */
 "use client";
 
 import App from "../components/App";
 import Footer from "../components/Footer";
 import DarkModeToggle from "../components/DarkModeToggle";
 import Link from "next/link";
+import { useAuth } from "../context/AuthContextProvider";
+
+const TIER_COLORS: Record<string, string> = {
+  FREE: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  PAID: "bg-[#0D9488]/10 text-[#0D9488] dark:text-[#5EEAD4]",
+  PRO: "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400",
+};
 
 const LiveCapsApp = () => {
+  const { user, logout } = useAuth();
+
   return (
     <>
       <div className="min-h-screen bg-gray-50 dark:bg-[#0D0D0D] flex flex-col transition-colors duration-200">
@@ -49,15 +45,30 @@ const LiveCapsApp = () => {
                 </span>
               </div>
 
-              {/* Right - Dark Mode Toggle */}
-              <div className="flex items-center gap-4">
+              {/* Right - User info + controls */}
+              <div className="flex items-center gap-3">
+                {user && (
+                  <>
+                    <Link
+                      href="/profile"
+                      className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 hover:text-[#0D9488] dark:hover:text-[#5EEAD4] transition-colors"
+                    >
+                      {user.name}
+                    </Link>
+                    <Link href="/profile">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full hover:opacity-80 transition-opacity cursor-pointer ${TIER_COLORS[user.tier]}`}>
+                        {user.tier}
+                      </span>
+                    </Link>
+                  </>
+                )}
                 <DarkModeToggle />
-                <Link
-                  href="/"
+                <button
+                  onClick={logout}
                   className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                 >
-                  ← Back
-                </Link>
+                  Logout
+                </button>
               </div>
             </div>
           </div>
