@@ -13,11 +13,12 @@ LiveCaps is a web application that:
 - Listens to your microphone.
 - Streams your voice to an external speech recognition service (Deepgram).
 - Receives text transcripts back in real time.
+- Optionally corrects domain-specific terms using a RAG-based vocabulary correction system.
 - Groups those transcripts into proper sentences.
 - Sends sentences to translation services (DeepL and Google Translate).
 - Shows one unified transcript where each sentence appears once, together with translations into one or more target languages.
 
-You open a web page (`/app`), allow microphone access, and start talking. The app does the rest.
+You open a web page (`/app`), allow microphone access, optionally upload your presentation materials for better accuracy, and start talking. The app does the rest.
 
 From a technical point of view, LiveCaps is:
 
@@ -174,11 +175,13 @@ High-level meanings:
 
 - [app](app) – main Next.js App Router directory.
 - [app/app](app/app) – pages and layout for the `/app` route (the main UI).
-- [app/components](app/components) – React components.
+- [app/components](app/components) – React components, including the RAG upload UI.
 - [app/context](app/context) – context providers for microphone, Deepgram, etc.
-- [app/api](app/api) – backend API routes.
-- [app/lib](app/lib) – server-side utilities (e.g., translation cache).
-- [app/services](app/services) – client-side services (e.g., translation helper functions).
+- [app/api](app/api) – backend API routes, including RAG endpoints under `app/api/rag/`.
+- [app/lib](app/lib) – server-side utilities: translation cache and RAG pipeline modules (document parsing, term extraction, embeddings, phonetic matching, vector store, LLM correction).
+- [app/hooks](app/hooks) – React hooks, including `useRAG` for managing RAG state.
+- [app/services](app/services) – client-side services (translation, RAG API wrapper).
+- [app/types](app/types) – TypeScript type definitions, including RAG interfaces.
 - [public](public) – static assets (images, icons, etc.).
 
 ---
@@ -356,11 +359,80 @@ From the App’s perspective, it does not need to know how many languages are in
 
 ---
 
-## 8. Backend API Routes
+## 8. RAG Vocabulary Correction
+
+LiveCaps includes an optional RAG (Retrieval-Augmented Generation) system that corrects domain-specific terms that speech recognition gets wrong.
+
+### 8.1 The Problem
+
+Speech recognition models are trained on general language. They handle everyday words well, but they often misrecognize:
+
+- Technical terms ("Kubernetes" → "cooper netties")
+- Product names ("Grafana" → "Gravana")
+- People's names ("Dr. Nguyen" → "Dr. Win")
+- Acronyms used in speech ("gRPC" → "G RPC")
+
+### 8.2 How RAG Solves It
+
+Before a session, the user uploads their presentation materials (slides, notes, papers). The system:
+
+1. **Parses** the documents to extract raw text.
+2. **Identifies** important terms (proper nouns, technical jargon, acronyms).
+3. **Indexes** these terms in a vector database with semantic embeddings and phonetic codes.
+4. During transcription, when Deepgram marks a word with low confidence:
+   - The system searches the knowledge base using both **semantic similarity** (does it mean something similar?) and **phonetic similarity** (does it sound similar?).
+   - An **LLM** (Groq's Llama 3.3 70B) reviews the top candidates and decides which corrections to apply in context.
+   - The corrected transcript replaces the original.
+
+### 8.3 Key Files
+
+- [app/lib/documentParser.ts](app/lib/documentParser.ts) – parses PDF, DOCX, PPTX, TXT, and MD files into raw text.
+- [app/lib/termExtractor.ts](app/lib/termExtractor.ts) – scans text for important terms, categorizes them, and generates phonetic codes.
+- [app/lib/embeddingsService.ts](app/lib/embeddingsService.ts) – converts terms into 768-dimensional vectors using Jina AI.
+- [app/lib/vectorStore.ts](app/lib/vectorStore.ts) – stores and searches vectors in Upstash Vector DB.
+- [app/lib/phoneticMatcher.ts](app/lib/phoneticMatcher.ts) – implements Soundex and Metaphone algorithms for sound-alike matching.
+- [app/lib/corrector.ts](app/lib/corrector.ts) – orchestrates the full correction flow.
+- [app/lib/llmCorrection.ts](app/lib/llmCorrection.ts) – sends candidates to Groq LLM for context-aware correction decisions.
+
+### 8.4 The Hybrid Search Strategy
+
+The system uses two matching strategies in parallel:
+
+1. **Semantic search** (60% weight) – "Does this word mean something similar to a knowledge base term?" Uses vector cosine similarity.
+2. **Phonetic search** (40% weight) – "Does this word sound like a knowledge base term?" Uses Soundex and Metaphone algorithms.
+
+Combining both strategies is important because:
+- Semantic search alone might miss "cooper netties" → "Kubernetes" (they don't mean the same thing).
+- Phonetic search alone might produce false positives for words that sound similar but are clearly wrong in context.
+- The combination, followed by LLM review, gives high accuracy.
+
+### 8.5 Frontend Components
+
+- [app/components/RAGUpload.tsx](app/components/RAGUpload.tsx) – the upload UI. Supports drag-and-drop, shows real-time progress via Server-Sent Events, and displays the extracted term summary.
+- [app/hooks/useRAG.ts](app/hooks/useRAG.ts) – React hook that manages session state and provides a `correctTranscript()` method to the App component.
+- [app/services/ragService.ts](app/services/ragService.ts) – client-side wrapper for the RAG API endpoints.
+
+### 8.6 Environment Variables
+
+To enable RAG, set in `.env.local`:
+
+```bash
+RAG_ENABLED=true
+UPSTASH_VECTOR_REST_URL=your_url
+UPSTASH_VECTOR_REST_TOKEN=your_token
+JINA_API_KEY=your_jina_key
+GROQ_API_KEY=your_groq_key
+```
+
+Without these variables, the RAG system is disabled and does not affect normal transcription behavior.
+
+---
+
+## 9. Backend API Routes
 
 All server-side logic lives under [app/api](app/api). These are not separate servers; they are functions deployed as serverless handlers or Node handlers by Next.js.
 
-### 8.1 /api/authenticate
+### 9.1 /api/authenticate
 
 File: [app/api/authenticate/route.ts](app/api/authenticate/route.ts)
 
@@ -374,7 +446,7 @@ Why not send the API key directly to the client via environment variables?
 - API keys should never be exposed to client bundles or source code.
 - This route can implement additional checks, rate limiting, or other logic if needed.
 
-### 8.2 /api/translate
+### 9.2 /api/translate
 
 File: [app/api/translate/route.ts](app/api/translate/route.ts)
 
@@ -390,7 +462,18 @@ Purpose:
 
 This code also handles error cases gracefully and ensures that even partial failures do not crash the client.
 
-### 8.3 /api/cache
+### 9.3 /api/rag
+
+The RAG API routes handle document upload, transcript correction, and session management:
+
+- `POST /api/rag/upload-stream` – upload a document and index terms, with SSE progress events.
+- `POST /api/rag/correct` – correct a transcript using the session's knowledge base.
+- `GET /api/rag/session` – get session statistics.
+- `DELETE /api/rag/session` – delete a session and its indexed terms.
+
+See [ARCHITECTURE_AND_WALKTHROUGH.md](ARCHITECTURE_AND_WALKTHROUGH.md) section 12 for detailed API documentation.
+
+### 9.4 /api/cache
 
 File: [app/api/cache/route.ts](app/api/cache/route.ts)
 
@@ -406,24 +489,24 @@ This is mainly used for performance tuning and diagnostics, not by end-users.
 
 ---
 
-## 9. Server-Side Translation Cache
+## 10. Server-Side Translation Cache
 
 File: [app/lib/translationCache.ts](app/lib/translationCache.ts)
 
 This file defines a singleton cache object that lives on the server side.
 
-### 9.1 What It Stores
+### 10.1 What It Stores
 
 - Key: combination of `originalText` + `targetLanguage`.
 - Value: translated text and metadata.
 
-### 9.2 Why Cache?
+### 10.2 Why Cache?
 
 - Many events and talks use repeated phrases ("Welcome", "Thank you", etc.).
 - Translation providers cost money and add latency.
 - If we have translated the same phrase before, we can serve it from memory almost instantly.
 
-### 9.3 Characteristics
+### 10.3 Characteristics
 
 - Bounded size (e.g., up to N entries).
 - Entries expire after a certain **time-to-live (TTL)**.
@@ -432,11 +515,11 @@ This file defines a singleton cache object that lives on the server side.
 
 ---
 
-## 10. Configuration, Environment, and Local Setup
+## 11. Configuration, Environment, and Local Setup
 
 Configuration is mostly done through environment variables and a few config files.
 
-### 10.1 Environment Variables
+### 11.1 Environment Variables
 
 File: [sample.env.local](sample.env.local)
 
@@ -446,7 +529,7 @@ This file lists the variables you should define in `.env.local` for local develo
 - `DEEPGRAM_ENV` – environment label (e.g., `development`).
 - `DEEPL_API_KEY` – optional; enables DeepL translations.
 
-### 10.2 Local Development Loop
+### 11.2 Local Development Loop
 
 Typical steps to run locally:
 
@@ -463,11 +546,11 @@ From there, you can:
 
 ---
 
-## 11. Reading and Modifying the Code
+## 12. Reading and Modifying the Code
 
 If you want to extend or modify LiveCaps, it helps to know where to start.
 
-### 11.1 I want to change the UI layout
+### 12.1 I want to change the UI layout
 
 Look in:
 
@@ -475,7 +558,7 @@ Look in:
 - [app/components/App.tsx](app/components/App.tsx) – the main runtime component.
 - [app/components](app/components) – specific UI pieces (selectors, toggles, footers, etc.).
 
-### 11.2 I want to change how Deepgram is used
+### 12.2 I want to change how Deepgram is used
 
 Look in:
 
@@ -488,7 +571,7 @@ You can change:
 - Whether you use interim results.
 - Endpointing / utterance settings.
 
-### 11.3 I want to change translation behavior
+### 12.3 I want to change translation behavior
 
 Look in:
 
@@ -496,7 +579,37 @@ Look in:
 - [app/services/translationService.ts](app/services/translationService.ts) – to change sentence splitting, batching, or error handling.
 - [app/lib/translationCache.ts](app/lib/translationCache.ts) – to change cache size or TTL.
 
-### 11.4 I want to add a new context or shared service
+### 12.4 I want to change the RAG vocabulary correction system
+
+The RAG system lives in several locations:
+
+- **Backend pipeline** (all in [app/lib](app/lib)):
+  - [documentParser.ts](app/lib/documentParser.ts) – add support for new file formats here
+  - [termExtractor.ts](app/lib/termExtractor.ts) – adjust term detection rules, categories, or phonetic code generation
+  - [embeddingsService.ts](app/lib/embeddingsService.ts) – switch embedding providers or adjust caching
+  - [vectorStore.ts](app/lib/vectorStore.ts) – change vector DB, search weights, or batch sizes
+  - [phoneticMatcher.ts](app/lib/phoneticMatcher.ts) – modify phonetic algorithms or similarity thresholds
+  - [llmCorrection.ts](app/lib/llmCorrection.ts) – change LLM provider, model, prompt, or temperature
+  - [corrector.ts](app/lib/corrector.ts) – adjust the overall correction flow, confidence thresholds, or query building
+
+- **API routes** (in [app/api/rag](app/api/rag)):
+  - [upload-stream/route.ts](app/api/rag/upload-stream/route.ts) – streaming upload with SSE progress
+  - [correct/route.ts](app/api/rag/correct/route.ts) – transcript correction endpoint
+  - [session/route.ts](app/api/rag/session/route.ts) – session management
+
+- **Frontend** (React components and hooks):
+  - [app/components/RAGUpload.tsx](app/components/RAGUpload.tsx) – upload UI (drag-drop, progress, results)
+  - [app/hooks/useRAG.ts](app/hooks/useRAG.ts) – React hook managing session state and correction calls
+  - [app/services/ragService.ts](app/services/ragService.ts) – client-side API wrapper
+
+- **Types and config**:
+  - [app/types/rag.ts](app/types/rag.ts) – all type definitions and `DEFAULT_RAG_CONFIG`
+
+- **Tests**:
+  - [app/lib/__tests__/](app/lib/__tests__/) – unit tests for each pipeline module
+  - [__tests__/rag-integration.test.ts](__tests__/rag-integration.test.ts) – end-to-end tests
+
+### 12.5 I want to add a new context or shared service
 
 You can follow existing patterns in [app/context](app/context) and [app/services](app/services):
 
@@ -506,7 +619,7 @@ You can follow existing patterns in [app/context](app/context) and [app/services
 
 ---
 
-## 12. Glossary of Key Terms
+## 13. Glossary of Key Terms
 
 A small glossary for quick reference:
 
@@ -528,9 +641,21 @@ A small glossary for quick reference:
 
 - **Client vs Server** – Client code runs in the browser; server code runs in the Node.js / serverless environment. In this project, context providers and components run on the client; API routes and `lib` helpers run on the server.
 
+- **RAG (Retrieval-Augmented Generation)** – A technique where a system retrieves relevant information from a knowledge base and uses it to augment (improve) a generative process. Here, user-uploaded documents form the knowledge base, and the system retrieves matching terms to correct transcription output.
+
+- **Embedding** – A numerical vector representation of text that captures its semantic meaning. Similar texts have similar embeddings. Used here to find terms in the knowledge base that are semantically related to misrecognized words.
+
+- **Soundex / Metaphone** – Phonetic algorithms that encode words by how they sound, so that words with similar pronunciation produce the same or similar codes. Used to catch transcription errors where the misrecognized word sounds like the correct term.
+
+- **Vector Database** – A database optimized for storing and querying high-dimensional vectors (embeddings). Upstash Vector is used here to store term embeddings and perform similarity searches.
+
+- **Hybrid Search** – A search strategy that combines multiple matching approaches (here: semantic similarity and phonetic similarity) to produce more accurate results than either approach alone.
+
+- **SSE (Server-Sent Events)** – A standard for the server to push updates to the client over a single HTTP connection. Used by the RAG upload endpoint to stream processing progress.
+
 ---
 
-## 13. Final Notes
+## 14. Final Notes
 
 This guide is meant to be a narrative companion to the more compact technical reference in:
 

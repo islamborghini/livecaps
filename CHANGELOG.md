@@ -1,5 +1,32 @@
 Change Log
 
+## [Unreleased]
+
+### Features
+
+* **RAG vocabulary correction system** – upload presentation materials (PDF, PPTX, DOCX, TXT, MD) to build a per-session knowledge base. Low-confidence words from Deepgram transcription are automatically corrected using hybrid semantic + phonetic search and LLM-based decisions.
+  * **Document parsing** – extract text from PDF (unpdf), DOCX (mammoth), PPTX (JSZip), and plain text files.
+  * **Term extraction** – identify proper nouns, technical terms, acronyms, and multi-word phrases with context, phonetic codes, and category labels.
+  * **Embedding generation** – convert terms to 768-dimensional vectors using Jina AI (jina-embeddings-v3) with LRU caching and hash-based fallback.
+  * **Vector indexing** – store and search term embeddings in Upstash Vector with per-session isolation.
+  * **Hybrid search** – combine semantic similarity (60%) and phonetic matching via Soundex/Metaphone (40%) for retrieval.
+  * **LLM correction** – use Groq (Llama 3.3 70B) at temperature 0.1 for context-aware correction decisions, with rule-based fallback.
+  * **Streaming upload** – SSE-based progress reporting during document processing.
+  * **Frontend integration** – drag-and-drop upload component (RAGUpload), useRAG hook for session management, client-side RAG service wrapper.
+  * **Multi-file support** – upload multiple documents into a single session with cumulative knowledge base.
+  * **Session management** – create, query, and delete RAG sessions via REST API.
+
+* **Multi-file attachment** – support uploading multiple context documents per session, including PPTX format.
+
+### Bug Fixes
+
+* Fixed file disappearing in fullscreen mode.
+
+### Tests
+
+* Added comprehensive test suite for RAG modules: document parser, term extractor, phonetic matcher, and corrector.
+* Added end-to-end RAG integration tests covering the full pipeline from upload to correction.
+
 ## [1.0.2](https://github.com/deepgram-starters/nextjs-live-transcription/compare/1.0.1...1.0.2) (2024-07-11)
 
 
