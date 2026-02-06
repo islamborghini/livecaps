@@ -38,10 +38,11 @@ export interface VectorStoreConfig {
 
 /**
  * Default vector store configuration
+ * Note: env vars are read lazily via getter to avoid build-time evaluation
  */
 export const DEFAULT_VECTOR_STORE_CONFIG: VectorStoreConfig = {
-  url: process.env.UPSTASH_VECTOR_REST_URL || "",
-  token: process.env.UPSTASH_VECTOR_REST_TOKEN || "",
+  get url() { return process.env.UPSTASH_VECTOR_REST_URL || ""; },
+  get token() { return process.env.UPSTASH_VECTOR_REST_TOKEN || ""; },
   namespacePrefix: "livecaps_rag_",
   defaultTopK: 10,
   semanticWeight: 0.6,
