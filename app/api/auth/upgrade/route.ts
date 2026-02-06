@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/prisma";
-import { getCurrentUser, createToken, setAuthCookie } from "@/app/lib/auth";
+import { getCurrentUser } from "@/app/lib/auth";
 
-// POST /api/auth/upgrade — upgrade user tier
+// POST /api/auth/upgrade — redirect to Stripe checkout for upgrade
+// This route is kept for backward compatibility but now redirects to Stripe
 export async function POST(req: NextRequest) {
   try {
     const payload = await getCurrentUser();
@@ -19,25 +19,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // In production, you'd verify payment here (Stripe, etc.)
-    // For now, we just upgrade directly
-
-    const updated = await prisma.user.update({
-      where: { id: payload.userId },
-      data: { tier },
-      select: { id: true, email: true, name: true, tier: true },
-    });
-
-    // Refresh JWT with new tier
-    const token = await createToken({
-      userId: updated.id,
-      email: updated.email,
-      name: updated.name,
-      tier: updated.tier,
-    });
-    setAuthCookie(token);
-
-    return NextResponse.json({ user: updated });
+    // Redirect to Stripe checkout instead of direct upgrade
+    return NextResponse.json(
+      { error: "Please use /api/stripe/checkout for upgrades", redirect: "/api/stripe/checkout" },
+      { status: 302 }
+    );
   } catch (error) {
     console.error("Upgrade error:", error);
     return NextResponse.json(

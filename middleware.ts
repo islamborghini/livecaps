@@ -77,13 +77,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // --- Stripe webhook: public (verified by Stripe signature) ---
+  if (pathname === "/api/stripe/webhook") {
+    return NextResponse.next();
+  }
+
   // --- Protected API routes: 401 if not authenticated ---
   if (
     pathname === "/api/auth/me" ||
     pathname.startsWith("/api/usage/") ||
     pathname.startsWith("/api/sessions") ||
     pathname === "/api/auth/profile" ||
-    pathname === "/api/auth/upgrade"
+    pathname === "/api/auth/upgrade" ||
+    pathname === "/api/stripe/checkout" ||
+    pathname === "/api/stripe/portal"
   ) {
     const authed = await isAuthenticated(request);
     if (!authed) {
@@ -123,5 +130,6 @@ export const config = {
     "/api/auth/:path*",
     "/api/usage/:path*",
     "/api/sessions/:path*",
+    "/api/stripe/:path*",
   ],
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContextProvider";
 import DarkModeToggle from "../components/DarkModeToggle";
@@ -32,8 +33,8 @@ const TIER_COLORS: Record<string, string> = {
 
 const TIER_INFO: Record<string, { name: string; limit: string; price: string }> = {
   FREE: { name: "Free", limit: "20 min/day", price: "Free" },
-  PAID: { name: "Paid", limit: "3 hours/day", price: "$9/mo" },
-  PRO: { name: "Pro", limit: "Unlimited", price: "$29/mo" },
+  PAID: { name: "Paid", limit: "3 hours/day", price: "$9.90/mo" },
+  PRO: { name: "Pro", limit: "Unlimited", price: "$29.90/mo" },
 };
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -85,6 +86,23 @@ export default function ProfilePage() {
 
   // Upgrade state
   const [upgrading, setUpgrading] = useState(false);
+
+  // URL params for Stripe redirect feedback
+  const searchParams = useSearchParams();
+  const [upgradeNotice, setUpgradeNotice] = useState("");
+
+  useEffect(() => {
+    const upgraded = searchParams.get("upgraded");
+    const cancelled = searchParams.get("cancelled");
+    if (upgraded) {
+      setUpgradeNotice(`Successfully upgraded to ${upgraded.toUpperCase()}! Your plan is now active.`);
+      // Clean URL
+      window.history.replaceState({}, "", "/profile");
+    } else if (cancelled) {
+      setUpgradeNotice("");
+      window.history.replaceState({}, "", "/profile");
+    }
+  }, [searchParams]);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -155,19 +173,36 @@ export default function ProfilePage() {
   const handleUpgrade = async (tier: "PAID" | "PRO") => {
     setUpgrading(true);
     try {
-      const res = await fetch("/api/auth/upgrade", {
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tier }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      fetchProfile();
-      // Force page reload to refresh auth context
-      window.location.reload();
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err: any) {
       alert(err.message);
-    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setUpgrading(true);
+    try {
+      const res = await fetch("/api/stripe/portal", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      alert(err.message);
       setUpgrading(false);
     }
   };
@@ -251,6 +286,18 @@ export default function ProfilePage() {
         {/* Overview Tab */}
         {activeTab === "overview" && (
           <div className="space-y-6">
+            {/* Upgrade success notice */}
+            {upgradeNotice && (
+              <div className="p-4 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium flex items-center justify-between">
+                <span>{upgradeNotice}</span>
+                <button onClick={() => setUpgradeNotice("")} className="text-green-500 hover:text-green-700 dark:hover:text-green-300 ml-4">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
             {/* Stats cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] rounded-xl p-5">
@@ -300,7 +347,7 @@ export default function ProfilePage() {
                         Upgrade to Paid
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        3 hours/day · $9/mo
+                        3 hours/day · $9.90/mo
                       </p>
                     </button>
                   )}
@@ -313,15 +360,37 @@ export default function ProfilePage() {
                       Upgrade to Pro
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Unlimited · $29/mo
+                      Unlimited · $29.90/mo
                     </p>
                   </button>
                 </div>
               )}
               {profile?.tier === "PRO" && (
-                <p className="text-sm text-[#0D9488] dark:text-[#5EEAD4] font-medium">
-                  You&apos;re on the highest plan with unlimited usage.
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-[#0D9488] dark:text-[#5EEAD4] font-medium">
+                    You&apos;re on the highest plan with unlimited usage.
+                  </p>
+                  <button
+                    onClick={handleManageBilling}
+                    disabled={upgrading}
+                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  >
+                    Manage Billing
+                  </button>
+                </div>
+              )}
+
+              {/* Manage billing for PAID users */}
+              {profile?.tier === "PAID" && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/[0.08]">
+                  <button
+                    onClick={handleManageBilling}
+                    disabled={upgrading}
+                    className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+                  >
+                    Manage Billing &rarr;
+                  </button>
+                </div>
               )}
             </div>
           </div>
