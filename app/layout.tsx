@@ -20,6 +20,8 @@ import { DeepgramContextProvider } from "./context/DeepgramContextProvider";
 import { MultiDeepgramContextProvider } from "./context/MultiDeepgramContextProvider";
 import { MicrophoneContextProvider } from "./context/MicrophoneContextProvider";
 import { DarkModeContextProvider } from "./context/DarkModeContextProvider";
+import { AuthContextProvider } from "./context/AuthContextProvider";
+import { UsageContextProvider } from "./context/UsageContextProvider";
 
 import "./globals.css";
 
@@ -62,13 +64,17 @@ export default function RootLayout({
         )}`}
       >
         <DarkModeContextProvider>
-          <MicrophoneContextProvider>
-            <DeepgramContextProvider>
-              <MultiDeepgramContextProvider>
-                {children}
-              </MultiDeepgramContextProvider>
-            </DeepgramContextProvider>
-          </MicrophoneContextProvider>
+          <AuthContextProvider>
+            <UsageContextProvider>
+              <MicrophoneContextProvider>
+                <DeepgramContextProvider>
+                  <MultiDeepgramContextProvider>
+                    {children}
+                  </MultiDeepgramContextProvider>
+                </DeepgramContextProvider>
+              </MicrophoneContextProvider>
+            </UsageContextProvider>
+          </AuthContextProvider>
         </DarkModeContextProvider>
       </body>
     </html>

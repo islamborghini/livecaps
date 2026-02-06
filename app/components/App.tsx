@@ -40,6 +40,9 @@ import RAGUpload, { UploadedFile } from "./RAGUpload";
 import { useRAG } from "@/app/hooks/useRAG";
 import { WordConfidence } from "@/app/types/rag";
 import { TranscriptionMode, WinnerTranscript } from "../types/multiDeepgram";
+import { useUsage } from "../context/UsageContextProvider";
+import UsageIndicator from "./UsageIndicator";
+import TimeExpiredOverlay from "./TimeExpiredOverlay";
 
 /**
  * Languages supported by Nova-3's multilingual mode (language=multi)
@@ -89,6 +92,9 @@ type TranscriptBlock = {
 };
 
 const App: () => JSX.Element = () => {
+  // Usage tracking
+  const { isTimeExpired, startTimer, stopTimer } = useUsage();
+
   // Session language configuration - defines spoken and display languages
   // Initialize with default values to avoid hydration mismatch
   // Load from localStorage after mount
@@ -966,6 +972,9 @@ const App: () => JSX.Element = () => {
     if (!microphone) return;
 
     const onData = (e: BlobEvent) => {
+      // Gate audio when usage limit reached
+      if (isTimeExpired) return;
+
       // iOS SAFARI FIX:
       // Prevent packetZero from being sent. If sent at size 0, the connection will close.
       // Also check if connection is actually open before sending
@@ -1207,6 +1216,36 @@ const App: () => JSX.Element = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionState, isMultiMode]); // Added isMultiMode to dependencies
 
+  // Start/stop usage timer based on connection and microphone state
+  useEffect(() => {
+    const isActive =
+      connectionState === LiveConnectionState.OPEN &&
+      microphoneState === MicrophoneState.Open &&
+      !isTimeExpired;
+
+    if (isActive) {
+      startTimer();
+    } else {
+      stopTimer();
+    }
+  }, [connectionState, microphoneState, isTimeExpired, startTimer, stopTimer]);
+
+  // Disconnect on time expiry
+  useEffect(() => {
+    if (isTimeExpired) {
+      if (microphoneState === MicrophoneState.Open) {
+        microphone?.pause();
+      }
+      if (connectionState === LiveConnectionState.OPEN) {
+        if (isMultiMode) {
+          multiContext.disconnectFromDeepgram();
+        } else {
+          singleContext.connection?.finish();
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeExpired]);
 
   // Scroll to bottom when transcript updates
   useEffect(() => {
@@ -1460,6 +1499,8 @@ const App: () => JSX.Element = () => {
                 {/* RAG Upload - Compact Mode */}
                 <RAGUpload compact uploadedFiles={uploadedFiles} setUploadedFiles={setUploadedFiles} isRAGEnabled={isRAGEnabled} setIsRAGEnabled={setIsRAGEnabled} />
 
+                <UsageIndicator />
+
                 <button
                   onClick={() => setIsFullscreen(true)}
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors shadow-sm"
@@ -1511,7 +1552,8 @@ const App: () => JSX.Element = () => {
           </div>
 
           {/* Unified Transcript Interface */}
-          <div className="rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] overflow-hidden backdrop-blur-sm shadow-sm dark:shadow-none">
+          <div className="relative rounded-2xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] overflow-hidden backdrop-blur-sm shadow-sm dark:shadow-none">
+            <TimeExpiredOverlay />
             <div className="bg-gray-50 dark:bg-white/[0.02] px-8 py-5 border-b border-gray-200 dark:border-white/[0.05]">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#0D9488]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
