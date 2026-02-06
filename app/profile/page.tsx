@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useCallback, Suspense, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContextProvider";
@@ -69,7 +69,7 @@ function formatTime(dateStr: string): string {
   });
 }
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const { user, logout } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -545,5 +545,17 @@ export default function ProfilePage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0D0D0D] flex items-center justify-center">
+        <div className="animate-pulse text-gray-400">Loading profile...</div>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
   );
 }
