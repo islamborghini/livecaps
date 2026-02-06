@@ -17,28 +17,31 @@ This document is a single, detailed guide to how LiveCaps works: the runtime arc
 9. [Caching Architecture](#caching-architecture)
 10. [Context Providers](#context-providers)
 11. [Core UI Components](#core-ui-components)
-12. [Configuration and Environment](#configuration-and-environment)
-13. [Error Handling and Resilience](#error-handling-and-resilience)
-14. [Performance Characteristics and Tuning](#performance-characteristics-and-tuning)
-15. [Extensibility and Future Work](#extensibility-and-future-work)
+12. [RAG Vocabulary Correction System](#rag-vocabulary-correction-system)
+13. [Configuration and Environment](#configuration-and-environment)
+14. [Error Handling and Resilience](#error-handling-and-resilience)
+15. [Performance Characteristics and Tuning](#performance-characteristics-and-tuning)
+16. [Extensibility and Future Work](#extensibility-and-future-work)
 
 ---
 
 ## 1. System Overview
 
-LiveCaps is a browser-based real-time captioning system with optional live translation. It is built on:
+LiveCaps is a browser-based real-time captioning system with optional live translation and domain-specific vocabulary correction. It is built on:
 
 - **Next.js 14 (App Router)** for routing, server-side APIs, and static assets.
 - **React 18** for the UI and client-side state management.
 - **Deepgram Nova-3** for live speech-to-text over WebSockets.
 - **DeepL** (with Google Translate as a fallback) for text translation.
+- **RAG pipeline** (Upstash Vector + Jina AI + Groq) for vocabulary correction using uploaded documents.
 
-The system is optimized for low end-to-end latency and a stable reading experience. It runs two main loops:
+The system is optimized for low end-to-end latency and a stable reading experience. It runs two main loops plus an optional correction step:
 
 1. An **audio → text** loop that streams microphone audio to Deepgram and receives transcripts.
-2. A **text → translation** loop that batches completed sentences, sends them to a translation API, and updates the UI as translations arrive.
+2. An optional **text → correction** step that uses RAG to fix low-confidence domain-specific words.
+3. A **text → translation** loop that batches completed sentences, sends them to a translation API, and updates the UI as translations arrive.
 
-All real-time behavior runs in the browser as client components and React context providers. Server-side code is limited to a few focused API routes for authentication, translation, and caching.
+All real-time behavior runs in the browser as client components and React context providers. Server-side code is limited to focused API routes for authentication, translation, caching, and RAG operations.
 
 ---
 
@@ -88,6 +91,7 @@ flowchart LR
     Mic[Microphone API]
     DGCtx[Deepgram / MultiDeepgram Contexts]
     App[App.tsx Orchestrator]
+    RAGHook[useRAG Hook]
     UI[React UI Transcript + Controls]
   end
 
@@ -96,16 +100,23 @@ flowchart LR
     Translate["/api/translate"]
     CacheAPI["/api/cache"]
     Cache["ServerTranslationCache"]
+    RAGCorrect["/api/rag/correct"]
+    RAGUpload["/api/rag/upload-stream"]
   end
 
   subgraph External
     DG[Deepgram Nova-3]
     DL[DeepL]
     GT[Google Translate]
+    Jina[Jina AI Embeddings]
+    Upstash[Upstash Vector DB]
+    Groq[Groq LLM]
   end
 
   Mic --> DGCtx
   DGCtx --> App
+  App --> RAGHook
+  RAGHook --> App
   App --> UI
 
   App -->|auth request| Auth
@@ -122,6 +133,14 @@ flowchart LR
   Translate --> DL
   Translate --> GT
   Translate --> App
+
+  RAGHook -->|upload documents| RAGUpload
+  RAGHook -->|correct transcript| RAGCorrect
+  RAGUpload --> Jina
+  RAGUpload --> Upstash
+  RAGCorrect --> Jina
+  RAGCorrect --> Upstash
+  RAGCorrect --> Groq
 ```
 
 ---
@@ -151,7 +170,17 @@ The route handles:
 - Provider selection and language code mapping.
 - Error handling and normalized responses back to the client.
 
-### 3.3 Browser APIs
+### 3.3 RAG pipeline services
+
+The optional RAG (Retrieval-Augmented Generation) vocabulary correction system uses three external services:
+
+- **Upstash Vector** – serverless vector database for storing and querying term embeddings. Each user session gets its own namespace for isolation. Terms are stored with metadata (original term, context, phonetic code, category, source file). Queried via REST API using `@upstash/vector`.
+
+- **Jina AI** – embedding generation service using the `jina-embeddings-v3` model (768 dimensions). Used to convert extracted terms and search queries into semantic vectors. Results are cached in an LRU cache with 24-hour TTL to minimize API calls.
+
+- **Groq** – fast LLM inference platform running `llama-3.3-70b-versatile`. Used for the final correction decision: given a transcript with low-confidence words and a list of candidate terms from the knowledge base, the model decides which replacements are appropriate in context. Temperature is set to 0.1 for deterministic output.
+
+### 3.4 Browser APIs
 
 The client uses several browser APIs:
 
@@ -173,11 +202,14 @@ The root project is a Next.js 14 App Router application. At a high level:
 Key subdirectories under `app/`:
 
 - [app/app](app/app) – page shell and layout for the main `/app` route.
-- [app/components](app/components) – presentational and container components, including the main runtime component.
+- [app/components](app/components) – presentational and container components, including the main runtime component and the RAG upload UI.
 - [app/context](app/context) – React Context providers for microphone, Deepgram, multi-language logic, and dark mode.
-- [app/api](app/api) – route handlers for authentication, translation, caching, and tests.
-- [app/lib](app/lib) – server-side utilities (e.g., translation cache singleton).
-- [app/services](app/services) – client-side services (e.g., translation service, sentence detection).
+- [app/api](app/api) – route handlers for authentication, translation, caching, RAG operations, and tests.
+- [app/api/rag](app/api/rag) – RAG-specific API routes: `upload-stream` (document indexing with SSE), `correct` (transcript correction), `session` (session management).
+- [app/lib](app/lib) – server-side utilities including the translation cache and the full RAG pipeline (document parsing, term extraction, embeddings, phonetic matching, vector store, LLM correction).
+- [app/hooks](app/hooks) – React hooks, including `useRAG` for managing RAG session state.
+- [app/services](app/services) – client-side services (translation service, sentence detection, RAG API wrapper).
+- [app/types](app/types) – TypeScript definitions including RAG interfaces and configuration types.
 - [app/utils](app/utils) – small shared utilities (e.g., audio duplication, confidence comparison).
 
 Supporting root files:
@@ -573,9 +605,211 @@ The most important UI pieces live under [app/components](app/components).
 
 ---
 
-## 12. Configuration and Environment
+## 12. RAG Vocabulary Correction System
 
-### 12.1 Environment variables
+The RAG (Retrieval-Augmented Generation) system is an optional feature that improves transcription accuracy for domain-specific vocabulary. Users upload presentation materials before a session, and the system learns the terminology to correct recognition errors in real time.
+
+### 12.1 Motivation
+
+Speech recognition models work well for common language but often struggle with specialized vocabulary: product names, technical jargon, people's names, acronyms, and organization names. The RAG system addresses this by building a per-session knowledge base from user-uploaded documents and using it to correct low-confidence words during live transcription.
+
+### 12.2 Architecture overview
+
+The RAG system has two main phases:
+
+1. **Upload phase** – documents are parsed, terms extracted, embedded, and indexed.
+2. **Correction phase** – low-confidence transcript words are matched against the knowledge base and corrected.
+
+```mermaid
+flowchart TD
+  subgraph Upload["Upload Phase"]
+    File[Document File]
+    Parse[Document Parser]
+    Extract[Term Extractor]
+    Embed[Jina Embeddings]
+    Index[Upstash Vector DB]
+  end
+
+  subgraph Correct["Correction Phase"]
+    Transcript[Deepgram Transcript]
+    Detect[Low-Confidence Detection]
+    Search[Hybrid Search]
+    LLM[Groq LLM Correction]
+    Output[Corrected Transcript]
+  end
+
+  File --> Parse --> Extract --> Embed --> Index
+  Transcript --> Detect --> Search
+  Index -.->|query| Search
+  Search --> LLM --> Output
+```
+
+### 12.3 Upload pipeline
+
+The upload pipeline processes documents in four stages, reported to the client via Server-Sent Events (SSE):
+
+#### Stage 1: Document parsing ([app/lib/documentParser.ts](app/lib/documentParser.ts))
+
+Extracts raw text from uploaded files:
+
+| Format | Library | Details |
+|--------|---------|---------|
+| PDF | `unpdf` | Extracts text from all pages |
+| DOCX | `mammoth` | Extracts paragraphs as plain text |
+| PPTX | `JSZip` | Parses the ZIP archive, reads slide XML (`ppt/slides/slide*.xml`) and speaker notes |
+| TXT | native | Direct text read |
+| MD | native | Direct text read |
+
+Maximum file size: 10 MB. The parser returns the raw text, file metadata, and processing time.
+
+#### Stage 2: Term extraction ([app/lib/termExtractor.ts](app/lib/termExtractor.ts))
+
+Analyzes the parsed text to identify important domain-specific terms:
+
+- **Proper nouns** – capitalized words in mid-sentence (e.g., "Kubernetes", "Dr. Smith")
+- **Technical terms** – camelCase, snake_case, kebab-case identifiers
+- **Acronyms** – uppercase sequences (e.g., "API", "OAuth2", "HTTP")
+- **Multi-word phrases** – named entities like "New York City", "Google Cloud Platform"
+
+Each extracted term includes:
+- The term itself and its normalized form
+- Surrounding context (2–3 sentences)
+- Phonetic code (Soundex)
+- Frequency count
+- Category (`person`, `organization`, `product`, `technical`, `acronym`, `general`)
+- Source file and location
+
+#### Stage 3: Embedding generation ([app/lib/embeddingsService.ts](app/lib/embeddingsService.ts))
+
+Converts terms into 768-dimensional semantic vectors using Jina AI:
+
+- **Model:** `jina-embeddings-v3`
+- **Batch processing:** up to 150 terms per batch
+- **Rate limiting:** 25 ms delay between API calls
+- **Caching:** LRU cache (10,000 entries, 24-hour TTL)
+- **Fallback:** hash-based embeddings if the Jina API is unavailable
+
+Each term is embedded as a text string combining the term and its context (e.g., `"Kubernetes: orchestrates containerized applications across clusters"`).
+
+#### Stage 4: Vector indexing ([app/lib/vectorStore.ts](app/lib/vectorStore.ts))
+
+Stores embeddings in Upstash Vector with rich metadata:
+
+- **ID format:** `{sessionId}_{normalizedTerm}_{sourceFile}`
+- **Metadata:** term, normalized form, context, phonetic code, category, session ID, source file
+- **Session isolation:** all vectors for a session share a common session ID in metadata, enabling scoped queries
+- **Batch upsert:** processes all terms in a single batch operation
+
+### 12.4 Correction pipeline
+
+When a transcript arrives with low-confidence words, the correction pipeline activates:
+
+#### Step 1: Low-confidence detection ([app/lib/corrector.ts](app/lib/corrector.ts))
+
+- Deepgram provides word-level confidence scores (0–1) with each transcript.
+- Words with confidence below the threshold (default: 0.7) are flagged for potential correction.
+- Adjacent low-confidence words are grouped into phrases (e.g., "cooper" + "netties" → "cooper netties").
+
+#### Step 2: Query building
+
+For each low-confidence word or phrase, multiple search queries are generated:
+- The word/phrase itself
+- The phrase with surrounding context words (one word before/after)
+- Individual words from multi-word phrases
+
+This ensures broad coverage when searching the knowledge base.
+
+#### Step 3: Hybrid search ([app/lib/vectorStore.ts](app/lib/vectorStore.ts), [app/lib/phoneticMatcher.ts](app/lib/phoneticMatcher.ts))
+
+Two search strategies run in parallel and their results are combined:
+
+**Semantic search (weight: 0.6)**
+- The query is embedded using Jina AI
+- Upstash Vector is queried for the top-K most similar vectors (default K=10)
+- Returns terms ranked by cosine similarity
+
+**Phonetic search (weight: 0.4)**
+- Soundex and Metaphone codes are generated for the query
+- All terms in the session are compared phonetically
+- Levenshtein distance on phonetic codes determines similarity
+- Returns terms ranked by phonetic similarity
+
+**Score combination:**
+```
+combinedScore = (semanticScore × 0.6) + (phoneticScore × 0.4)
+```
+
+Results below the similarity threshold (default: 0.75) are discarded. The remaining candidates are ranked by combined score.
+
+#### Step 4: LLM correction ([app/lib/llmCorrection.ts](app/lib/llmCorrection.ts))
+
+The top candidate terms and the full transcript are sent to Groq's Llama 3.3 70B model:
+
+- **Temperature:** 0.1 (highly deterministic)
+- **Max tokens:** 512
+- **Timeout:** 5 seconds
+- The prompt instructs the model to only replace words that sound similar to a knowledge base term, preserving original words when uncertain
+- The model returns structured JSON with the corrected transcript and an array of corrections with reasons
+
+**Fallback:** If the LLM is unavailable (no API key, timeout, or error), a rule-based fallback applies corrections based on combined similarity scores alone.
+
+### 12.5 Frontend integration
+
+**RAGUpload component** ([app/components/RAGUpload.tsx](app/components/RAGUpload.tsx))
+- Drag-and-drop file upload interface
+- Real-time progress tracking via SSE
+- Displays indexed term counts and category breakdown
+- Supports multiple file uploads per session
+
+**useRAG hook** ([app/hooks/useRAG.ts](app/hooks/useRAG.ts))
+- Manages RAG session state (session ID, active status, statistics)
+- Persists session ID to localStorage
+- Provides `correctTranscript()` method consumed by the App component
+- Handles batching and debouncing of correction requests
+
+**ragService** ([app/services/ragService.ts](app/services/ragService.ts))
+- Client-side wrapper for all RAG API endpoints
+- Handles SSE stream parsing for upload progress
+- Error handling and retry logic
+
+### 12.6 API endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/rag/upload-stream` | POST | Upload a document, index terms, stream progress via SSE |
+| `/api/rag/correct` | POST | Correct a transcript using the session's knowledge base |
+| `/api/rag/session` | GET | Retrieve session statistics (term count, categories, documents) |
+| `/api/rag/session` | DELETE | Delete a session and all its indexed terms |
+| `/api/rag/upload` | POST | Non-streaming document upload (alternative to upload-stream) |
+
+### 12.7 Data types
+
+All RAG data structures are defined in [app/types/rag.ts](app/types/rag.ts):
+
+- `ExtractedTerm` – a term with context, phonetic code, category, and frequency
+- `UploadedContent` – parsed document content with extracted terms
+- `WordConfidence` – Deepgram word-level confidence data
+- `CorrectionRequest` / `CorrectionResponse` – correction API contracts
+- `CorrectionDetail` – individual correction with original, corrected, reason, and match type
+- `VectorSearchResult` – hybrid search result with semantic, phonetic, and combined scores
+- `RAGConfig` – system configuration with defaults (`DEFAULT_RAG_CONFIG`)
+- `RAGSessionStats` – session statistics for the management API
+
+### 12.8 Error handling and resilience
+
+The RAG system is designed to fail gracefully without affecting core transcription:
+
+- If the Jina API is unavailable, hash-based fallback embeddings are used
+- If the Groq API is unavailable, rule-based corrections are applied using similarity scores
+- If vector search fails, the original transcript is returned unchanged
+- All RAG operations have timeouts (3–5 seconds) to prevent blocking
+- The system is entirely optional: if `RAG_ENABLED` is not `true`, all RAG endpoints return early
+
+---
+
+## 13. Configuration and Environment
+
+### 13.1 Environment variables
 
 Key environment variables include:
 
@@ -583,13 +817,22 @@ Key environment variables include:
 - `DEEPGRAM_ENV` – optional environment tag (e.g., `development`).
 - `DEEPL_API_KEY` – optional, used to enable DeepL translations.
 
+RAG-specific variables (all optional):
+
+- `RAG_ENABLED` – set to `true` to enable the RAG correction system.
+- `UPSTASH_VECTOR_REST_URL` – Upstash Vector database REST URL.
+- `UPSTASH_VECTOR_REST_TOKEN` – Upstash Vector database authentication token.
+- `JINA_API_KEY` – Jina AI API key for embedding generation.
+- `GROQ_API_KEY` – Groq API key for LLM correction. If not set, rule-based fallback is used.
+- `RAG_CONFIDENCE_THRESHOLD` – override the default confidence threshold (0.7).
+
 A starter file at [sample.env.local](sample.env.local) lists required and optional variables. In development, you typically:
 
 1. Copy `sample.env.local` to `.env.local`.
 2. Fill in the key values.
 3. Run `npm run dev`.
 
-### 12.2 Build and runtime configuration
+### 13.2 Build and runtime configuration
 
 - [next.config.js](next.config.js) configures Next.js build behavior.
 - [tailwind.config.ts](tailwind.config.ts) configures Tailwind CSS.
@@ -597,7 +840,7 @@ A starter file at [sample.env.local](sample.env.local) lists required and option
 
 ---
 
-## 13. Error Handling and Resilience
+## 14. Error Handling and Resilience
 
 The system is designed to degrade gracefully when external services are unavailable.
 
@@ -618,17 +861,17 @@ The system is designed to degrade gracefully when external services are unavaila
 
 ---
 
-## 14. Performance Characteristics and Tuning
+## 15. Performance Characteristics and Tuning
 
 LiveCaps aims for low perceived latency and a smooth reading experience.
 
-### 14.1 Latency targets
+### 15.1 Latency targets
 
 - **Audio chunking** – 100 ms chunks balance responsiveness and overhead.
 - **Speech-to-text** – Deepgram typically responds within ~100 ms under normal network conditions.
 - **Translation** – 200–500 ms per sentence is typical, with faster responses for cache hits.
 
-### 14.2 Tuning knobs
+### 15.2 Tuning knobs
 
 Several parameters can be tuned:
 
@@ -651,7 +894,7 @@ Several parameters can be tuned:
 
 ---
 
-## 15. Extensibility and Future Work
+## 16. Extensibility and Future Work
 
 The architecture leaves room for several natural extensions:
 
