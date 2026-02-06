@@ -8,7 +8,12 @@
     "vercel-build": "VERCEL_BUILDING=1 next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "touch ./app/api/translate/detect/route.ts"
+    "postinstall": "touch ./app/api/translate/detect/route.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:rag": "jest app/lib/__tests__",
+    "test:integration": "jest __tests__/rag-integration.test.ts"
   },
   "dependencies": {
     "@deepgram/sdk": "^3.3.0",
@@ -33,6 +38,9 @@
     "@commitlint/config-conventional": "^19.1.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/react": "^14.0.0",
+    "@types/jest": "^29.5.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -41,9 +49,12 @@
     "eslint": "^8",
     "eslint-config-next": "14.0.1",
     "husky": "^9.0.11",
+    "jest": "^29.7.0",
+    "jest-environment-node": "^29.7.0",
     "postcss": "^8",
     "pretty-quick": "^4.0.0",
     "tailwindcss": "^3.4.1",
+    "ts-jest": "^29.1.0",
     "tsx": "4.20.6",
     "typescript": "^5"
   },
