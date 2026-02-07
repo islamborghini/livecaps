@@ -10,18 +10,53 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Linear-inspired color palette
+        // Existing LiveCaps palette (KEEP - referenced throughout the app)
         primary: {
           DEFAULT: '#0D9488',
           light: '#14B8A6',
           dark: '#0F766E',
+          foreground: '#FFFFFF',
         },
-        accent: '#5EEAD4',
+        accent: {
+          DEFAULT: '#5EEAD4',
+          foreground: '#0D0D0D',
+        },
         surface: {
           DEFAULT: '#0D0D0D',
           light: '#1A1A1A',
           lighter: '#2A2A2A',
         },
+        // shadcn system colors (CSS variable based)
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       animation: {
         // Bounces 5 times 1s equals 5 seconds
@@ -31,6 +66,8 @@ const config: Config = {
         "float": "float 6s ease-in-out infinite",
         "glow": "glow 2s ease-in-out infinite",
         "pulse-slow": "pulse 3s ease-in-out infinite",
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
       },
       keyframes: {
         slideUp: {
@@ -48,6 +85,14 @@ const config: Config = {
         glow: {
           "0%, 100%": { boxShadow: "0 0 20px rgba(13, 148, 136, 0.3)" },
           "50%": { boxShadow: "0 0 40px rgba(13, 148, 136, 0.5)" },
+        },
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       screens: {
@@ -82,7 +127,7 @@ const config: Config = {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        "gradient-mesh": 
+        "gradient-mesh":
           "radial-gradient(at 40% 20%, rgba(13, 148, 136, 0.15) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(20, 184, 166, 0.1) 0px, transparent 50%)",
       },
       fontFamily: {
@@ -96,5 +141,6 @@ const config: Config = {
       },
     },
   },
+  plugins: [require("tailwindcss-animate")],
 };
 export default config;

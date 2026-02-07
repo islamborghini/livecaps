@@ -1,21 +1,24 @@
 /**
  * Dark Mode Toggle Component
- * 
+ *
  * A toggle switch component for switching between light and dark modes.
- * Uses shadcn/ui-inspired styling with modern, clean design.
+ * Uses shadcn/ui Button wrapper with modern, clean design.
  */
 "use client";
 
 import React from "react";
 import { useDarkMode } from "../context/DarkModeContextProvider";
+import { Button } from "@/components/ui/button";
 
 const DarkModeToggle: React.FC = () => {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   return (
-    <button
+    <Button
+      variant="outline"
+      size="icon"
       onClick={toggleDarkMode}
-      className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
+      className="relative h-9 w-9 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm"
       role="switch"
       aria-checked={isDarkMode}
       aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
@@ -53,7 +56,7 @@ const DarkModeToggle: React.FC = () => {
           d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
         />
       </svg>
-    </button>
+    </Button>
   );
 };
 
