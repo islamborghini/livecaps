@@ -13,7 +13,7 @@
  */
 
 import { Inter } from "next/font/google";
-import classNames from "classnames";
+import { cn } from "@/lib/utils";
 import localFont from "next/font/local";
 
 import { DeepgramContextProvider } from "./context/DeepgramContextProvider";
@@ -58,10 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-dvh">
       <body
-        className={`h-full ${classNames(
-          favorit.variable,
-          inter.className
-        )}`}
+        className={cn("h-full", favorit.variable, inter.className)}
       >
         <DarkModeContextProvider>
           <AuthContextProvider>

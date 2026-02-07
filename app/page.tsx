@@ -15,6 +15,9 @@ import { useEffect, useRef, useState } from "react";
 import Footer from "./components/Footer";
 import DarkModeToggle from "./components/DarkModeToggle";
 import { useAuth } from "./context/AuthContextProvider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Mic, Zap, Languages, AudioLines, Globe, AlignLeft } from "lucide-react";
 
 // Animated counter hook
 const useCounter = (end: number, duration: number = 2000, start: number = 0) => {
@@ -146,13 +149,12 @@ const Home = () => {
                   >
                     {user.name}
                   </Link>
-                  <Link
-                    href="/app"
-                    className="group relative px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300"
-                  >
-                    <span className="relative z-10">Go to App</span>
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#0D9488]/20 to-[#14B8A6]/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
+                  <Button variant="nav-cta" size="sm" asChild>
+                    <Link href="/app">
+                      <span className="relative z-10">Go to App</span>
+                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#0D9488]/20 to-[#14B8A6]/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  </Button>
                 </>
               ) : (
                 <>
@@ -162,13 +164,12 @@ const Home = () => {
                   >
                     Log in
                   </Link>
-                  <Link
-                    href="/signup"
-                    className="group relative px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300"
-                  >
-                    <span className="relative z-10">Sign Up</span>
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#0D9488]/20 to-[#14B8A6]/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
+                  <Button variant="nav-cta" size="sm" asChild>
+                    <Link href="/signup">
+                      <span className="relative z-10">Sign Up</span>
+                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#0D9488]/20 to-[#14B8A6]/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  </Button>
                 </>
               )}
             </div>
@@ -191,13 +192,13 @@ const Home = () => {
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8 text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 mb-8 animate-fade-in">
+          <Badge variant="outline" className="px-4 py-2 bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 mb-8 animate-fade-in text-sm font-normal gap-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0D9488] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0D9488]"></span>
             </span>
-            <span className="text-sm text-gray-600 dark:text-gray-300">Now with multi-language detection</span>
-          </div>
+            <span className="text-gray-600 dark:text-gray-300">Now with multi-language detection</span>
+          </Badge>
 
           {/* Main Headline */}
           <h1 className="hero-title text-5xl md:text-7xl lg:text-7xl font-bold tracking-tight mb-6">
@@ -226,34 +227,32 @@ const Home = () => {
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-slide-up"
             style={{ animationDelay: "0.3s" }}
           >
-            <Link
-              href="/signup"
-              className="group relative inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white rounded-xl bg-gradient-to-r from-[#0D9488] to-[#14B8A6] hover:from-[#0F766E] hover:to-[#0D9488] transition-all duration-300 shadow-lg shadow-[#0D9488]/25 hover:shadow-xl hover:shadow-[#0D9488]/30"
-            >
-              <span>Get started free</span>
-              <svg
-                className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </Link>
-            <a
-              href="#features"
-              className="inline-flex items-center justify-center px-8 py-4 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              See how it works
-              <svg
-                className="ml-2 w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </a>
+            <Button variant="gradient" size="lg" className="group rounded-xl font-semibold" asChild>
+              <Link href="/signup">
+                <span>Get started free</span>
+                <svg
+                  className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+            </Button>
+            <Button variant="ghost-dark" size="lg" asChild>
+              <a href="#features">
+                See how it works
+                <svg
+                  className="ml-2 w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </a>
+            </Button>
           </div>
 
           {/* Product Preview */}
@@ -357,10 +356,10 @@ const Home = () => {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           {/* Section header */}
           <div className="text-center mb-20">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0D9488]/10 border border-[#0D9488]/20 mb-6">
+            <Badge variant="outline" className="bg-[#0D9488]/10 border-[#0D9488]/20 text-[#0D9488] mb-6 gap-2 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-[#0D9488]" />
-              <span className="text-sm text-[#0D9488] font-medium">Features</span>
-            </div>
+              Features
+            </Badge>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight">
               Everything you need to
               <span className="block bg-gradient-to-r from-[#0D9488] via-[#14B8A6] to-[#5EEAD4] bg-clip-text text-transparent">
@@ -382,14 +381,10 @@ const Home = () => {
               
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0D9488] to-[#14B8A6] flex items-center justify-center shadow-lg shadow-[#0D9488]/25 group-hover:scale-110 group-hover:shadow-xl group-hover:shadow-[#0D9488]/30 transition-all duration-300">
-                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
-                    </svg>
-                  </div>
-                  <div className="px-3 py-1 rounded-full bg-[#0D9488]/10 text-[#0D9488] text-xs font-medium">
+                  <Mic className="w-8 h-8 text-gray-400 dark:text-gray-500 group-hover:text-[#0D9488] dark:group-hover:text-[#5EEAD4] transition-colors duration-300" strokeWidth={1.5} />
+                  <Badge variant="outline" className="bg-[#0D9488]/10 border-[#0D9488]/20 text-[#0D9488] font-medium">
                     Core Feature
-                  </div>
+                  </Badge>
                 </div>
                 
                 <h3 className="text-2xl lg:text-3xl font-bold mb-4 text-gray-900 dark:text-white group-hover:text-[#0D9488] dark:group-hover:text-[#5EEAD4] transition-colors duration-300">
@@ -409,11 +404,7 @@ const Home = () => {
                 <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#10B981]/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
                 
                 <div className="relative z-10 flex items-start gap-5">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#10B981] to-[#34D399] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#10B981]/20 group-hover:scale-110 transition-transform duration-300">
-                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                  </div>
+                  <Zap className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-[#10B981] dark:group-hover:text-[#34D399] transition-colors duration-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
                   <div>
                     <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-[#10B981] dark:group-hover:text-[#34D399] transition-colors duration-300">Lightning Fast</h3>
                     <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
@@ -428,11 +419,7 @@ const Home = () => {
                 <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-[#14B8A6]/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
                 
                 <div className="relative z-10 flex items-start gap-5">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#14B8A6] to-[#5EEAD4] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#14B8A6]/20 group-hover:scale-110 transition-transform duration-300">
-                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/>
-                    </svg>
-                  </div>
+                  <Languages className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-[#14B8A6] dark:group-hover:text-[#5EEAD4] transition-colors duration-300 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
                   <div>
                     <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-[#14B8A6] dark:group-hover:text-[#5EEAD4] transition-colors duration-300">30+ Languages</h3>
                     <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
@@ -448,11 +435,7 @@ const Home = () => {
               <div className="absolute -top-12 -left-12 w-32 h-32 bg-[#F59E0B]/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
               
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#FBBF24] flex items-center justify-center mb-5 shadow-lg shadow-[#F59E0B]/20 group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                  </svg>
-                </div>
+                <AudioLines className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-[#F59E0B] dark:group-hover:text-[#FBBF24] transition-colors duration-300 mb-5" strokeWidth={1.5} />
                 <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-[#F59E0B] dark:group-hover:text-[#FBBF24] transition-colors duration-300">Multi-Language Detection</h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                   Automatically detect and transcribe multiple languages simultaneously.
@@ -464,11 +447,7 @@ const Home = () => {
               <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-[#EC4899]/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
               
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#EC4899] to-[#F472B6] flex items-center justify-center mb-5 shadow-lg shadow-[#EC4899]/20 group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
-                  </svg>
-                </div>
+                <Globe className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-[#EC4899] dark:group-hover:text-[#F472B6] transition-colors duration-300 mb-5" strokeWidth={1.5} />
                 <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-[#EC4899] dark:group-hover:text-[#F472B6] transition-colors duration-300">Browser-Based</h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                   No downloads required. Works directly in your browser with enterprise-grade security.
@@ -480,11 +459,7 @@ const Home = () => {
               <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#06B6D4]/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
               
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#06B6D4] to-[#22D3EE] flex items-center justify-center mb-5 shadow-lg shadow-[#06B6D4]/20 group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-                  </svg>
-                </div>
+                <AlignLeft className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-[#06B6D4] dark:group-hover:text-[#22D3EE] transition-colors duration-300 mb-5" strokeWidth={1.5} />
                 <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-[#06B6D4] dark:group-hover:text-[#22D3EE] transition-colors duration-300">Smart Formatting</h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                   Intelligent punctuation and sentence structure for clean, readable transcripts.
@@ -555,13 +530,14 @@ const Home = () => {
               "Korean", "Russian", "Portuguese", "Italian", "Dutch", "Arabic",
               "Hindi", "Turkish", "Polish", "Vietnamese", "Thai", "Indonesian"
             ].map((lang, i) => (
-              <div
+              <Badge
                 key={lang}
-                className="px-4 py-2 rounded-full bg-gray-100 dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.05] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/[0.05] hover:border-[#0D9488]/50 hover:text-gray-900 dark:hover:text-white transition-all duration-300 cursor-default"
+                variant="outline"
+                className="px-4 py-2 bg-gray-100 dark:bg-white/[0.02] border-gray-200 dark:border-white/[0.05] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/[0.05] hover:border-[#0D9488]/50 hover:text-gray-900 dark:hover:text-white transition-all duration-300 cursor-default font-normal text-sm"
                 style={{ animationDelay: `${i * 0.05}s` }}
               >
                 {lang}
-              </div>
+              </Badge>
             ))}
           </div>
         </div>
@@ -587,20 +563,19 @@ const Home = () => {
             <p className="text-xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto">
               Sign up in seconds and start transcribing. Free tier includes 20 minutes per day.
             </p>
-            <Link
-              href="/signup"
-              className="group inline-flex items-center justify-center px-10 py-5 text-lg font-semibold text-white rounded-xl bg-gradient-to-r from-[#0D9488] to-[#14B8A6] hover:from-[#0F766E] hover:to-[#0D9488] transition-all duration-300 shadow-lg shadow-[#0D9488]/25 hover:shadow-2xl hover:shadow-[#0D9488]/40 hover:scale-105"
-            >
-              <span>Get Started</span>
-              <svg
-                className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </Link>
+            <Button variant="gradient-lg" size="xl" className="group rounded-xl" asChild>
+              <Link href="/signup">
+                <span>Get Started</span>
+                <svg
+                  className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+            </Button>
 
             {/* Trust line */}
             <p className="mt-8 text-sm text-gray-500">

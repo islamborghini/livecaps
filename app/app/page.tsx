@@ -5,6 +5,8 @@ import Footer from "../components/Footer";
 import DarkModeToggle from "../components/DarkModeToggle";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContextProvider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 const TIER_COLORS: Record<string, string> = {
   FREE: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
@@ -56,19 +58,21 @@ const LiveCapsApp = () => {
                       {user.name}
                     </Link>
                     <Link href="/profile">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full hover:opacity-80 transition-opacity cursor-pointer ${TIER_COLORS[user.tier]}`}>
+                      <Badge className={`hover:opacity-80 transition-opacity cursor-pointer border-0 ${TIER_COLORS[user.tier]}`}>
                         {user.tier}
-                      </span>
+                      </Badge>
                     </Link>
                   </>
                 )}
                 <DarkModeToggle />
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={logout}
-                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
                   Logout
-                </button>
+                </Button>
               </div>
             </div>
           </div>
