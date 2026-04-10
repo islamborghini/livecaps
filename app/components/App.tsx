@@ -832,107 +832,35 @@ const App: () => JSX.Element = () => {
 
     processedFinalTexts.current.add(winner.transcript);
 
-    const textToProcess = winner.transcript;
     const detectedLanguages = [winner.language];
 
-    // Combine with existing buffer
-    const combinedText = (currentSentenceBuffer.current.text + " " + textToProcess).trim();
-    const combinedLanguages = [...new Set([...currentSentenceBuffer.current.languages, ...detectedLanguages])];
+    // Commit every final immediately as its own block. Previously we
+    // accumulated finals in a hidden buffer until a "complete sentence"
+    // threshold was met (≥60 chars, ≥4 words), which silently dropped
+    // short utterances and made early words disappear.
+    const block = createTranscriptBlock(winner.transcript, detectedLanguages);
+    setTranscriptBlocks(prev => [...prev, block]);
 
-    // Detect complete sentences
-    const newCompleteSentences = detectCompleteSentences(combinedText);
+    sessionLanguages.display.forEach(targetLang => {
+      queueTranslation(block.id, block.original.text, targetLang);
+    });
 
-    if (newCompleteSentences.length > 0) {
-      // Clear buffer timeout since we're processing
-      if (bufferTimeout.current) {
-        clearTimeout(bufferTimeout.current);
-        bufferTimeout.current = null;
-      }
-
-      // Calculate remaining text after extracting complete sentences
-      const allSentencesText = newCompleteSentences.join(' ');
-      const remainingText = combinedText.substring(allSentencesText.length).trim();
-
-      console.log(`✅ Created ${newCompleteSentences.length} new transcript blocks from winner`);
-
-      // Create transcript blocks for each complete sentence
-      const newBlocks = newCompleteSentences.map(sentenceText =>
-        createTranscriptBlock(sentenceText, combinedLanguages)
-      );
-
-      // Add blocks to transcript
-      setTranscriptBlocks(prev => [...prev, ...newBlocks]);
-
-      // Queue translations for all display languages
-      newBlocks.forEach(block => {
-        sessionLanguages.display.forEach(targetLang => {
-          queueTranslation(block.id, block.original.text, targetLang);
-        });
-
-        // Apply RAG correction asynchronously (non-blocking)
-        // Uses word confidences from the winner transcript if available
-        if (isRAGReady) {
-          const dominantLang = detectDominantLanguage(combinedLanguages);
-          applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
-        }
-      });
-
-      // Update buffer with remaining text
-      currentSentenceBuffer.current = {
-        text: remainingText,
-        languages: combinedLanguages
-      };
-    } else {
-      // No complete sentence yet, add to buffer
-      console.log(`📝 Buffering winner text (no complete sentence yet): "${textToProcess}"`);
-      currentSentenceBuffer.current = {
-        text: combinedText,
-        languages: combinedLanguages
-      };
-
-      // Set timeout to process buffer - longer timeout for better accumulation
-      if (bufferTimeout.current) {
-        clearTimeout(bufferTimeout.current);
-      }
-
-      bufferTimeout.current = setTimeout(() => {
-        // Only flush if we have substantial content (60+ chars, 4+ words)
-        const bufferedText = currentSentenceBuffer.current.text.trim();
-        // Word pattern covers Latin, Cyrillic, Korean, Chinese/Japanese
-        const wordPattern = /[A-Za-zА-Яа-яЁё\u4e00-\u9fff\uac00-\ud7af]+/g;
-        const wordCount = (bufferedText.match(wordPattern) || []).length;
-        
-        if (bufferedText.length >= 60 && wordCount >= 4) {
-          const bufferedLanguages = currentSentenceBuffer.current.languages;
-
-          // Add period if needed
-          const finalText = /[.!?]$/.test(bufferedText) ? bufferedText : bufferedText + ".";
-          
-          const block = createTranscriptBlock(finalText, bufferedLanguages);
-          setTranscriptBlocks(prev => [...prev, block]);
-
-          sessionLanguages.display.forEach(targetLang => {
-            queueTranslation(block.id, block.original.text, targetLang);
-          });
-
-          // Apply RAG correction asynchronously (non-blocking)
-          if (isRAGReady) {
-            const dominantLang = detectDominantLanguage(bufferedLanguages);
-            applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
-          }
-
-          currentSentenceBuffer.current = { text: "", languages: [] };
-          console.log(`📦 Timeout flush (${finalText.length} chars, ${wordCount} words)`);
-        } else if (bufferedText.length > 0) {
-          console.log(`⏳ Timeout: buffer too short (${bufferedText.length} chars, ${wordCount} words), keeping...`);
-        }
-      }, 3500); // Longer timeout for better accumulation
+    if (isRAGReady) {
+      const dominantLang = detectDominantLanguage(detectedLanguages);
+      applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
     }
+
+    // Clear any leftover state from the old buffered path
+    if (bufferTimeout.current) {
+      clearTimeout(bufferTimeout.current);
+      bufferTimeout.current = null;
+    }
+    currentSentenceBuffer.current = { text: "", languages: [] };
 
     // Clear interim text
     setCurrentInterimText("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionLanguages, detectCompleteSentences, createTranscriptBlock, isRAGReady, applyRAGCorrection, detectDominantLanguage]);
+  }, [sessionLanguages, createTranscriptBlock, isRAGReady, applyRAGCorrection, detectDominantLanguage]);
 
   /**
    * Add translation to queue (non-blocking).
@@ -1060,74 +988,35 @@ const App: () => JSX.Element = () => {
         if (processedFinalTexts.current.has(thisCaption)) {
           return;
         }
-        
+
         processedFinalTexts.current.add(thisCaption);
-        
-        // Combine buffer with new text (merging language metadata)
-        const combinedText = (currentSentenceBuffer.current.text + " " + thisCaption).trim();
-        const combinedLanguages = [...new Set([...currentSentenceBuffer.current.languages, ...detectedLanguages])];
-        const textToProcess = combinedText;
-        
-        // Wait for a longer pause or multiple sentences before processing
-        // This helps ensure we have complete context
-        const newCompleteSentences = detectCompleteSentences(textToProcess);
-        
-        if (newCompleteSentences.length > 0) {
-          // Clear any pending buffer timeout since we found complete sentences
-          if (bufferTimeout.current) {
-            clearTimeout(bufferTimeout.current);
-            bufferTimeout.current = null;
-          }
 
-          // Calculate what text remains after extracting complete sentences
-          const extractedText = newCompleteSentences.join(' ');
-          const remainingText = textToProcess.slice(extractedText.length).trim();
+        // Commit every final immediately as its own block. Previously we
+        // accumulated finals in a buffer until a "complete sentence" (≥60
+        // chars, ≥4 words) was available, which silently dropped short
+        // utterances and first words.
+        const block = createTranscriptBlock(thisCaption, detectedLanguages);
+        setTranscriptBlocks(prev => [...prev, block]);
 
-          // Create TranscriptBlocks for each complete sentence
-          const newBlocks = newCompleteSentences.map(sentenceText =>
-            createTranscriptBlock(sentenceText, combinedLanguages)
-          );
+        sessionLanguages.display.forEach(targetLang => {
+          queueTranslation(block.id, block.original.text, targetLang);
+        });
 
-          console.log(`✅ Created ${newBlocks.length} new transcript blocks:`, newBlocks.map(b => ({ id: b.id, text: b.original.text })));
-
-          // Add all new blocks to transcript
-          setTranscriptBlocks(prev => [...prev, ...newBlocks]);
-
-          // Queue translations for all display languages for each block
-          // Also apply RAG correction asynchronously if ready
-          newBlocks.forEach(block => {
-            sessionLanguages.display.forEach(targetLang => {
-              queueTranslation(block.id, block.original.text, targetLang);
-            });
-
-            // Apply RAG correction asynchronously (non-blocking)
-            // Pass word confidences from Deepgram for accurate correction targeting
-            if (isRAGReady) {
-              const dominantLang = detectDominantLanguage(combinedLanguages);
-              applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
-            }
-          });
-
-          // Keep any remaining text in buffer (preserving languages for next segment)
-          currentSentenceBuffer.current = { text: remainingText, languages: combinedLanguages };
-        } else {
-          // No complete sentences detected, keep building in buffer with language info
-          currentSentenceBuffer.current = { text: textToProcess, languages: combinedLanguages };
-          
-          // Set a timeout to process buffered text if no new transcription comes
-          // Longer timeout allows more content to accumulate
-          if (bufferTimeout.current) {
-            clearTimeout(bufferTimeout.current);
-          }
-          
-          bufferTimeout.current = setTimeout(() => {
-            processBufferedText();
-          }, 3500); // Longer timeout for better accumulation
+        if (isRAGReady) {
+          const dominantLang = detectDominantLanguage(detectedLanguages);
+          applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
         }
-        
+
+        // Clear any leftover state from the old buffered path
+        if (bufferTimeout.current) {
+          clearTimeout(bufferTimeout.current);
+          bufferTimeout.current = null;
+        }
+        currentSentenceBuffer.current = { text: "", languages: [] };
+
         // Clear interim display
         setCurrentInterimText("");
-        
+
       } else {
         // Show interim results without breaking sentences
         setCurrentInterimText(thisCaption);
