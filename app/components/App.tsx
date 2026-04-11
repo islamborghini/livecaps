@@ -153,7 +153,7 @@ const App: () => JSX.Element = () => {
   // Use the appropriate connection state based on actual mode being used
   const connectionState = isMultiMode ? multiContext.overallState : singleContext.connectionState;
 
-  const { setupMicrophone, microphone, startMicrophone, microphoneState, errorMessage, retrySetup } =
+  const { setupMicrophone, microphone, startMicrophone, stopMicrophone, microphoneState, errorMessage, retrySetup } =
     useMicrophone();
 
   // RAG integration for vocabulary-aware transcript correction
@@ -478,9 +478,15 @@ const App: () => JSX.Element = () => {
   // Track if this is the first render
   const isInitialMount = useRef(true);
   const previousSpokenLanguages = useRef<string[]>(sessionLanguages.spoken);
+  const previousDisplayLanguages = useRef<string[]>(sessionLanguages.display);
   const isReconnecting = useRef(false);
 
-  // Automatically reconnect when spoken languages change
+  // True when the user changed languages mid-session and we're waiting for
+  // them to click Resume (or refresh) to apply the new config.
+  const [languageChangePending, setLanguageChangePending] = useState(false);
+
+  // When languages change mid-session, just nudge the user to refresh.
+  // No disconnect, no auto-reconnect — simple.
   useEffect(() => {
     // Skip on initial mount
     if (isInitialMount.current) {
@@ -489,76 +495,30 @@ const App: () => JSX.Element = () => {
       return;
     }
 
-    // Check if languages actually changed
-    const languagesChanged =
+    const changed =
       sessionLanguages.spoken.length !== previousSpokenLanguages.current.length ||
       !sessionLanguages.spoken.every(lang => previousSpokenLanguages.current.includes(lang));
 
-    if (!languagesChanged || isReconnecting.current) {
-      return;
-    }
-
-    // Only reconnect if already connected
-    if (connectionState !== LiveConnectionState.OPEN) {
-      previousSpokenLanguages.current = sessionLanguages.spoken;
-      return;
-    }
-
-    console.log('🔄 Spoken languages changed, auto-reconnecting...');
-    isReconnecting.current = true;
     previousSpokenLanguages.current = sessionLanguages.spoken;
 
-    // Disconnect and clear (mode-aware)
-    if (isMultiMode) {
-      multiContext.disconnectFromDeepgram();
-    } else {
-      singleContext.disconnectFromDeepgram();
+    if (changed && connectionState === LiveConnectionState.OPEN) {
+      setLanguageChangePending(true);
     }
-
-    setTranscriptBlocks([]);
-    setCurrentInterimText("");
-    currentSentenceBuffer.current = { text: "", languages: [] };
-    processedFinalTexts.current.clear();
-
-    // Wait for clean disconnection then reconnect
-    const reconnectTimer = setTimeout(async () => {
-      if (isMultiMode && sessionLanguages.spoken.length > 1) {
-        console.log(`🌐 Reconnecting in multi-language mode with ${sessionLanguages.spoken.length} languages`);
-        try {
-          await multiContext.connectToDeepgram(sessionLanguages.spoken);
-        } catch (error) {
-          console.error('❌ Failed to reconnect in multi mode:', error);
-        }
-      } else {
-        const languageParam = sessionLanguages.spoken[0];
-        console.log(`🎯 Reconnecting in single-language mode: ${languageParam}`);
-
-        const connectionOptions = {
-          model: "nova-3",
-          language: languageParam,
-          interim_results: true,
-          smart_format: true,
-          punctuate: true,
-          endpointing: 300,
-          utterance_end_ms: 2500,
-          vad_events: true,
-        };
-
-        try {
-          await singleContext.connectToDeepgram(connectionOptions);
-        } catch (error) {
-          console.error('❌ Failed to reconnect in single mode:', error);
-        }
-      }
-
-      setTimeout(() => {
-        isReconnecting.current = false;
-      }, 2000);
-    }, 1000);
-
-    return () => clearTimeout(reconnectTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionLanguages.spoken]); // Removed connectionState to prevent loop - we check it inside the effect
+  }, [sessionLanguages.spoken]);
+
+  useEffect(() => {
+    const changed =
+      sessionLanguages.display.length !== previousDisplayLanguages.current.length ||
+      !sessionLanguages.display.every(lang => previousDisplayLanguages.current.includes(lang));
+
+    previousDisplayLanguages.current = sessionLanguages.display;
+
+    if (changed && connectionState === LiveConnectionState.OPEN) {
+      setLanguageChangePending(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLanguages.display]);
 
   // Preload common phrases for display languages
   useEffect(() => {
@@ -570,6 +530,33 @@ const App: () => JSX.Element = () => {
       }
     });
   }, [sessionLanguages.display]);
+
+  // Pause: stop feeding audio to Deepgram but keep the WebSocket alive
+  // (the keepAlive effect takes over while mic is not Open).
+  const handlePause = () => {
+    console.log('⏸️ Pause triggered');
+    // Flush any pending buffered content so nothing is lost across the pause
+    if (bufferTimeout.current) {
+      clearTimeout(bufferTimeout.current);
+      bufferTimeout.current = null;
+    }
+    stopMicrophone();
+  };
+
+  // Resume: if connection is still OPEN we only need to resume the mic;
+  // otherwise fall through to a full reconnect.
+  const handleResume = async () => {
+    if (
+      connectionState === LiveConnectionState.OPEN &&
+      (microphoneState === MicrophoneState.Paused ||
+        microphoneState === MicrophoneState.Pausing)
+    ) {
+      console.log('▶️ Resume triggered (socket still open, restarting mic)');
+      startMicrophone();
+      return;
+    }
+    await handleManualReconnect();
+  };
 
   // Manual reconnect function
   const handleManualReconnect = async () => {
@@ -589,8 +576,19 @@ const App: () => JSX.Element = () => {
       // Ignore disconnect errors
     }
 
-    // Clear state
-    setTranscriptBlocks([]);
+    // If the MediaRecorder is still running from the previous (now-dead)
+    // session, pause it so the connection effect can cleanly re-attach
+    // listeners and restart capture once the new socket is OPEN.
+    try {
+      if (microphone && microphone.state === "recording") {
+        microphone.pause();
+      }
+    } catch (e) {
+      console.warn('Could not pause microphone during resume:', e);
+    }
+
+    // Clear interim/buffer state (the committed transcript blocks are kept
+    // so resuming feels continuous, not like a fresh reload).
     setCurrentInterimText("");
     currentSentenceBuffer.current = { text: "", languages: [] };
     processedFinalTexts.current.clear();
@@ -1303,13 +1301,50 @@ const App: () => JSX.Element = () => {
           <div className="border-b border-gray-200 dark:border-white/[0.05] px-6 py-4 flex items-center justify-between bg-white/80 dark:bg-[#0D0D0D]/80 backdrop-blur-xl">
             <div className="flex items-center gap-4">
               <div className={`w-3 h-3 rounded-full ${
-                connectionState === LiveConnectionState.OPEN ? 'bg-[#10B981]' :
+                connectionState === LiveConnectionState.OPEN && microphoneState === MicrophoneState.Open ? 'bg-[#10B981]' :
+                connectionState === LiveConnectionState.OPEN && (microphoneState === MicrophoneState.Paused || microphoneState === MicrophoneState.Pausing) ? 'bg-[#F59E0B]' :
                 connectionState === LiveConnectionState.CONNECTING ? 'bg-[#F59E0B]' : 'bg-gray-400'
               }`} />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {connectionState === LiveConnectionState.OPEN ? 'Connected' :
+                {connectionState === LiveConnectionState.OPEN && (microphoneState === MicrophoneState.Paused || microphoneState === MicrophoneState.Pausing) ? 'Paused' :
+                 connectionState === LiveConnectionState.OPEN ? 'Connected' :
                  connectionState === LiveConnectionState.CONNECTING ? 'Connecting...' : 'Disconnected'}
               </span>
+              {/* Pause button - shows when actively transcribing */}
+              {connectionState === LiveConnectionState.OPEN &&
+                microphoneState === MicrophoneState.Open && (
+                  <button
+                    onClick={handlePause}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Pause
+                  </button>
+                )}
+
+              {/* Resume button - shows when paused OR disconnected with mic usable */}
+              {((connectionState === LiveConnectionState.OPEN &&
+                (microphoneState === MicrophoneState.Paused ||
+                  microphoneState === MicrophoneState.Pausing)) ||
+                (connectionState === LiveConnectionState.CLOSED &&
+                  microphoneState !== null &&
+                  microphoneState !== MicrophoneState.NotSetup &&
+                  microphoneState !== MicrophoneState.SettingUp &&
+                  microphoneState !== MicrophoneState.Error)) && (
+                <button
+                  onClick={handleResume}
+                  disabled={isReconnecting.current}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-5.197-3.03A1 1 0 008 9.03v5.94a1 1 0 001.555.832l5.197-3.03a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Resume
+                </button>
+              )}
               <div className="ml-6 flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400">Speaking:</span>
@@ -1358,6 +1393,21 @@ const App: () => JSX.Element = () => {
             </div>
           </div>
 
+          {/* Language change prompt - fullscreen */}
+          {languageChangePending && (
+            <div className="flex items-center justify-between gap-3 mx-6 mt-4 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50">
+              <span className="text-sm text-amber-800 dark:text-amber-200">
+                Refresh page to apply new languages.
+              </span>
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-md transition-colors shadow-sm"
+              >
+                Refresh
+              </button>
+            </div>
+          )}
+
           {/* Unified Transcript - Fullscreen */}
           <div
             ref={fullscreenTranscriptRef}
@@ -1396,11 +1446,13 @@ const App: () => JSX.Element = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${
-                    connectionState === LiveConnectionState.OPEN ? 'bg-[#10B981]' :
+                    connectionState === LiveConnectionState.OPEN && microphoneState === MicrophoneState.Open ? 'bg-[#10B981]' :
+                    connectionState === LiveConnectionState.OPEN && (microphoneState === MicrophoneState.Paused || microphoneState === MicrophoneState.Pausing) ? 'bg-[#F59E0B]' :
                     connectionState === LiveConnectionState.CONNECTING ? 'bg-[#F59E0B] animate-pulse' : 'bg-gray-500'
                   }`} />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {connectionState === LiveConnectionState.OPEN ? 'Connected' :
+                    {connectionState === LiveConnectionState.OPEN && (microphoneState === MicrophoneState.Paused || microphoneState === MicrophoneState.Pausing) ? 'Paused' :
+                     connectionState === LiveConnectionState.OPEN ? 'Connected' :
                      connectionState === LiveConnectionState.CONNECTING ? 'Connecting...' : 'Disconnected'}
                   </span>
                   {connectionState === LiveConnectionState.OPEN && (
@@ -1410,16 +1462,39 @@ const App: () => JSX.Element = () => {
                         : 'Multi-language mode'}
                     </span>
                   )}
-                  {/* Reconnect Button - shows when disconnected */}
-                  {connectionState === LiveConnectionState.CLOSED && microphoneState === MicrophoneState.Ready && (
+                  {/* Pause button - shows when actively transcribing */}
+                  {connectionState === LiveConnectionState.OPEN &&
+                    microphoneState === MicrophoneState.Open && (
+                      <button
+                        onClick={handlePause}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pause
+                      </button>
+                    )}
+
+                  {/* Resume button - shows when paused OR disconnected with mic usable */}
+                  {((connectionState === LiveConnectionState.OPEN &&
+                    (microphoneState === MicrophoneState.Paused ||
+                      microphoneState === MicrophoneState.Pausing)) ||
+                    (connectionState === LiveConnectionState.CLOSED &&
+                      microphoneState !== null &&
+                      microphoneState !== MicrophoneState.NotSetup &&
+                      microphoneState !== MicrophoneState.SettingUp &&
+                      microphoneState !== MicrophoneState.Error)) && (
                     <button
-                      onClick={handleManualReconnect}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm"
+                      onClick={handleResume}
+                      disabled={isReconnecting.current}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-5.197-3.03A1 1 0 008 9.03v5.94a1 1 0 001.555.832l5.197-3.03a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Reconnect
+                      Resume
                     </button>
                   )}
                 </div>
@@ -1464,6 +1539,21 @@ const App: () => JSX.Element = () => {
                   />
                 </div>
               </div>
+
+              {/* Language change prompt - shows after user changes languages mid-session */}
+              {languageChangePending && (
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50">
+                  <span className="text-sm text-amber-800 dark:text-amber-200">
+                    Refresh page to apply new languages.
+                  </span>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-md transition-colors shadow-sm"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              )}
 
               {/* Mode Toggle */}
               {sessionLanguages.spoken.length > 1 && (
@@ -1570,10 +1660,21 @@ const App: () => JSX.Element = () => {
                     <span className="text-xs text-teal-600 dark:text-teal-400">Requesting permission...</span>
                   </div>
                 ) : microphone ? (
-                  <div className="flex items-center gap-2">
-                    <Visualizer microphone={microphone} height={40} />
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Recording</span>
-                  </div>
+                  microphoneState === MicrophoneState.Paused ||
+                  microphoneState === MicrophoneState.Pausing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1" style={{ height: 40 }}>
+                        <span className="w-1 h-4 bg-amber-500/50 rounded-sm" />
+                        <span className="w-1 h-4 bg-amber-500/50 rounded-sm" />
+                      </div>
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Paused</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Visualizer microphone={microphone} height={40} />
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Recording</span>
+                    </div>
+                  )
                 ) : (
                   <span className="text-xs text-gray-500">No microphone detected</span>
                 )}
