@@ -218,51 +218,157 @@ export async function correctTranscript(
   globalStats.totalRequests++;
 
   try {
-    // Step 1: Identify low-confidence words
+    // Step 1: Identify low-confidence words (Deepgram told us it was unsure)
     const threshold = request.confidenceThreshold || cfg.confidenceThreshold;
     const lowConfidenceWords = identifyLowConfidenceWords(request.wordConfidences, threshold);
 
     log(`Found ${lowConfidenceWords.length} low-confidence words (threshold: ${threshold})`);
 
-    // Early exit: no low-confidence words
-    if (lowConfidenceWords.length < cfg.minLowConfidenceWords) {
-      log("No correction needed - all words above threshold");
-      return createUnchangedResponse(request, startTime);
-    }
-
-    // Step 2: Check if session has indexed content
+    // Step 2: Check if session has indexed content. Without a vocabulary there's
+    // nothing to correct against, so bail early.
     const hasContent = await hasSessionContent(request.sessionId).catch(() => false);
-    
+
     if (!hasContent && !cfg.cachedTerms?.length) {
       log("No indexed content for session - skipping correction");
       return createUnchangedResponse(request, startTime);
     }
 
-    // Step 3: Build search queries from low-confidence words
-    const allWords = request.transcript.split(/\s+/);
-    const searchQueries = buildSearchQueries(
-      lowConfidenceWords.map(w => ({ word: w.word, position: w.position })),
-      allWords
-    );
-
-    log(`Built ${searchQueries.length} search queries`, searchQueries, true);
-
-    // Step 4: Fetch session terms for hybrid search (phonetic + semantic)
+    // Step 3: Fetch session terms up-front. We need them before the phonetic
+    // sweep can run, regardless of whether low-confidence words were found.
     let sessionTerms: ExtractedTerm[] = cfg.cachedTerms || [];
-    
-    if (sessionTerms.length === 0 && cfg.useHybridSearch) {
-      log("Fetching session terms for hybrid search...");
+
+    if (sessionTerms.length === 0) {
+      log("Fetching session terms for phonetic sweep / hybrid search...");
       sessionTerms = await getSessionTerms(request.sessionId);
-      log(`Retrieved ${sessionTerms.length} terms for phonetic matching`);
-      
-      // Debug: log some sample terms
+      log(`Retrieved ${sessionTerms.length} terms`);
+
       if (sessionTerms.length > 0) {
         const sampleTerms = sessionTerms.slice(0, 5).map(t => t.term);
         log(`Sample terms: ${sampleTerms.join(", ")}`);
       }
     }
 
-    // Step 5: Search for matching terms
+    // Step 4: Phonetic sweep. Scan EVERY word in the transcript against indexed
+    // terms, regardless of Deepgram confidence. This catches high-confidence
+    // real-word mishearings like "Groq" → "rock" that the confidence gate misses.
+    const allWords = request.transcript.split(/\s+/);
+    const suspiciousPositions = new Map<
+      number,
+      { word: string; confidence: number; position: number; start: number; end: number }
+    >();
+
+    // Seed with low-confidence words first
+    for (const lcw of lowConfidenceWords) {
+      suspiciousPositions.set(lcw.position, lcw);
+    }
+
+    log(
+      `[SWEEP] Entering phonetic sweep. ` +
+        `wordConfidences=${request.wordConfidences.length}, ` +
+        `sessionTerms=${sessionTerms.length}`
+    );
+    if (sessionTerms.length > 0) {
+      log(
+        `[SWEEP] First 10 indexed terms: ${sessionTerms
+          .slice(0, 10)
+          .map(t => t.term)
+          .join(", ")}`
+      );
+    }
+
+    if (sessionTerms.length > 0) {
+      const { calculatePhoneticSimilarity } = await import("./phoneticMatcher");
+      const sweepThreshold = 0.6; // similarity at/above this = worth investigating
+
+      // Build a lowercase set of indexed terms (and their head words) for fast
+      // "already correct" checks. A word is only "already correct" if it exactly
+      // matches an indexed term string — NOT if it merely shares a phonetic code
+      // (homophones like "Grock"/"Groq" share a metaphone but one is wrong).
+      const indexedWordSet = new Set<string>();
+      for (const term of sessionTerms) {
+        const norm = term.normalizedTerm || term.term.toLowerCase();
+        indexedWordSet.add(norm);
+        for (const w of norm.split(/\s+/)) {
+          if (w) indexedWordSet.add(w);
+        }
+      }
+
+      for (let i = 0; i < request.wordConfidences.length; i++) {
+        if (suspiciousPositions.has(i)) continue; // already queued via low-confidence path
+
+        const wc = request.wordConfidences[i];
+        // Skip trivial words — tiny tokens produce noisy phonetic matches
+        const cleaned = wc.word.replace(/[^\p{L}\p{N}]/gu, "");
+        if (cleaned.length < 3) {
+          log(`[SWEEP] skip "${wc.word}" @${i} — too short (cleaned="${cleaned}")`);
+          continue;
+        }
+
+        const cleanedLower = cleaned.toLowerCase();
+        // Exact match against an indexed term → word is already correct
+        if (indexedWordSet.has(cleanedLower)) {
+          log(`[SWEEP] skip "${wc.word}" @${i} — already in indexed term set`);
+          continue;
+        }
+
+        let bestSim = 0;
+        let bestTerm = "";
+        for (const term of sessionTerms) {
+          // Compare against the first word of multi-word terms too, since we're
+          // scanning per-word against potentially multi-word vocabulary entries.
+          const termHead = term.term.split(/\s+/)[0];
+          const { similarity } = calculatePhoneticSimilarity(cleaned, termHead);
+          if (similarity > bestSim) {
+            bestSim = similarity;
+            bestTerm = termHead;
+          }
+        }
+
+        log(
+          `[SWEEP] word "${wc.word}" @${i} conf=${wc.confidence.toFixed(2)} ` +
+            `bestSim=${bestSim.toFixed(3)} bestTerm="${bestTerm}" ` +
+            `→ ${bestSim >= sweepThreshold ? "FLAGGED" : "ok"}`
+        );
+
+        // A homophone (phonetic similarity 1.0 but different spelling) is the
+        // MOST important case to catch, e.g. "Grock" ↔ "Groq" both encode to KRK.
+        if (bestSim >= sweepThreshold) {
+          suspiciousPositions.set(i, {
+            word: wc.word,
+            confidence: wc.confidence,
+            position: i,
+            start: wc.start,
+            end: wc.end,
+          });
+        }
+      }
+    }
+
+    const suspiciousWords = Array.from(suspiciousPositions.values()).sort(
+      (a, b) => a.position - b.position
+    );
+
+    log(
+      `Total suspicious words: ${suspiciousWords.length} ` +
+        `(${lowConfidenceWords.length} low-confidence + ` +
+        `${suspiciousWords.length - lowConfidenceWords.length} phonetic-sweep)`
+    );
+
+    // Early exit: nothing suspicious in either bucket
+    if (suspiciousWords.length < cfg.minLowConfidenceWords) {
+      log("No correction needed - no low-confidence or phonetically suspicious words");
+      return createUnchangedResponse(request, startTime);
+    }
+
+    // Step 5: Build search queries from the combined suspicious set
+    const searchQueries = buildSearchQueries(
+      suspiciousWords.map(w => ({ word: w.word, position: w.position })),
+      allWords
+    );
+
+    log(`Built ${searchQueries.length} search queries`, searchQueries, true);
+
+    // Step 6: Search for matching terms
     let candidateTerms: VectorSearchResult[] = [];
 
     if (cfg.skipVectorSearch && sessionTerms.length > 0) {
@@ -341,7 +447,15 @@ export async function correctTranscript(
       return createUnchangedResponse(request, startTime);
     }
 
-    // Step 6: Apply corrections using LLM
+    // Step 7: Apply corrections using LLM. Pass the full suspicious set
+    // (low-confidence ∪ phonetic sweep) as explicit focus words so the LLM and
+    // rule-based fallback both know to look at high-confidence mishearings.
+    const focusWords = suspiciousWords.map(w => ({
+      word: w.word,
+      confidence: w.confidence,
+      position: w.position,
+    }));
+
     const correctionResult = await processCorrection(
       request,
       candidateTerms,
@@ -349,10 +463,11 @@ export async function correctTranscript(
         useLLM: cfg.useLLMCorrection,
         apiKey: process.env.GROQ_API_KEY,
         ruleBasedThreshold: cfg.similarityThreshold,
-      }
+      },
+      focusWords
     );
 
-    // Step 6: Build response
+    // Step 8: Build response
     const processingTimeMs = Date.now() - startTime;
 
     const response: CorrectionResponse = {

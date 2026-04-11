@@ -146,12 +146,33 @@ export function useRAG(options: UseRAGOptions = {}): UseRAGReturn {
 
     try {
       const response = await serviceRef.current!.uploadContent(file);
-      
+
       if (response.success && response.sessionId) {
         setSessionIdState(response.sessionId);
-        // Fetch session info after successful upload
-        const info = await serviceRef.current!.getSessionInfo(response.sessionId);
-        setSessionInfo(info);
+
+        // Synthesize sessionInfo directly from the upload response instead of
+        // re-fetching via GET /api/rag/session. Upstash Vector's filtered
+        // queries are eventually consistent: the vectors are written by the
+        // time upload returns, but `filter: sessionId = 'xxx'` does not
+        // immediately see them, so `hasSessionContent` would return 404 for a
+        // few hundred ms after a successful upload. Caching that 404 as
+        // `sessionInfo.exists=false` permanently disabled RAG until page
+        // reload. Since the upload response already tells us exactly how many
+        // terms were indexed, we don't need a round-trip to confirm.
+        if (response.terms.indexed > 0) {
+          setSessionInfo({
+            exists: true,
+            sessionId: response.sessionId,
+            totalTerms: response.terms.indexed,
+            documentCount: 1,
+            lastUpdated: new Date().toISOString(),
+            categoryBreakdown: response.terms.categories,
+          });
+        } else {
+          // Nothing indexed — fall back to querying the server for stats.
+          const info = await serviceRef.current!.getSessionInfo(response.sessionId);
+          setSessionInfo(info);
+        }
       } else if (response.error) {
         setError(response.error);
       }

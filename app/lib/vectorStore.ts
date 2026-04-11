@@ -13,6 +13,11 @@ import { Index } from "@upstash/vector";
 import { ExtractedTerm, TermVectorRecord, VectorSearchResult, RAGSessionStats } from "../types/rag";
 import { embedText, embedBatch, cosineSimilarity } from "./embeddingsService";
 import { findPhoneticallySimilarTerms, calculatePhoneticSimilarity, PhoneticMatch } from "./phoneticMatcher";
+import {
+  getCachedSessionTerms,
+  hasCachedSession,
+  clearCachedSession,
+} from "./sessionTermCache";
 
 /**
  * Vector store configuration
@@ -420,6 +425,9 @@ export async function clearSession(
 
   console.log(`🗑️ Clearing session ${sessionId}...`);
 
+  // Drop the in-process cache entry regardless of vector-store outcome.
+  clearCachedSession(sessionId);
+
   try {
     // Use deleteMany with filter for efficient deletion
     // This is more efficient than querying first
@@ -468,6 +476,26 @@ export async function getSessionStats(
   sessionId: string,
   config: Partial<VectorStoreConfig> = {}
 ): Promise<RAGSessionStats> {
+  // Prefer cached data if present — see comment on getSessionTerms for the
+  // eventual-consistency rationale.
+  const cached = getCachedSessionTerms(sessionId);
+  if (cached && cached.length > 0) {
+    const categories: Record<string, number> = {};
+    const sources = new Set<string>();
+    for (const t of cached) {
+      const cat = t.category || "general";
+      categories[cat] = (categories[cat] || 0) + 1;
+      if (t.sourceFile) sources.add(t.sourceFile);
+    }
+    return {
+      sessionId,
+      totalTerms: cached.length,
+      documentCount: sources.size || 1,
+      lastUpdated: new Date(),
+      categoryBreakdown: categories,
+    };
+  }
+
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const index = getVectorIndex(cfg);
 
@@ -545,12 +573,19 @@ export async function getSessionStats(
 }
 
 /**
- * Check if a session has any indexed content
+ * Check if a session has any indexed content.
+ *
+ * Checks the in-process cache first — Upstash Vector's filtered queries are
+ * eventually consistent, so for a brief window after upload the filter query
+ * returns 0 results even though the vectors are present. The cache is
+ * populated synchronously by the upload route, so it's the authoritative
+ * "does this session exist" signal immediately after upload.
  */
 export async function hasSessionContent(
   sessionId: string,
   config: Partial<VectorStoreConfig> = {}
 ): Promise<boolean> {
+  if (hasCachedSession(sessionId)) return true;
   const stats = await getSessionStats(sessionId, config);
   return stats.totalTerms > 0;
 }
@@ -563,6 +598,17 @@ export async function getSessionTerms(
   sessionId: string,
   config: Partial<VectorStoreConfig> = {}
 ): Promise<ExtractedTerm[]> {
+  // Prefer the in-process cache populated at upload time. This avoids the
+  // eventual-consistency window on Upstash filtered queries, which would
+  // otherwise return an empty list for a session that was just indexed.
+  const cached = getCachedSessionTerms(sessionId);
+  if (cached && cached.length > 0) {
+    console.log(
+      `📚 Using cached session terms for ${sessionId}: ${cached.length} terms`
+    );
+    return cached;
+  }
+
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const index = getVectorIndex(cfg);
 

@@ -434,32 +434,40 @@ export function applyRuleBasedCorrections(
 /**
  * Process a complete correction request
  * This is the main entry point for the correction system
+ *
+ * @param focusWords - Optional explicit list of words to focus correction on.
+ *   When provided, overrides the default confidence-based filter. This lets
+ *   upstream (corrector.ts) flag high-confidence phonetic near-misses like
+ *   "Grock" ↔ "Groq" that the confidence gate would otherwise miss.
  */
 export async function processCorrection(
   request: CorrectionRequest,
   candidateTerms: VectorSearchResult[],
-  config: Partial<LLMCorrectionConfig> = {}
+  config: Partial<LLMCorrectionConfig> = {},
+  focusWords?: Array<{ word: string; confidence: number; position: number }>
 ): Promise<CorrectionResponse> {
   const startTime = Date.now();
   const cfg = { ...DEFAULT_LLM_CONFIG, ...config };
 
   console.log(`\n🔧 Processing correction for: "${request.transcript.substring(0, 50)}..."`);
 
-  // Identify low-confidence words
-  const confidenceThreshold = request.confidenceThreshold || 0.7;
-  const lowConfidenceWords = request.wordConfidences
-    .filter(wc => wc.confidence < confidenceThreshold)
-    .map((wc, idx) => ({
-      word: wc.word,
-      confidence: wc.confidence,
-      position: idx,
-    }));
+  // Prefer explicit focus list (from upstream phonetic sweep); fall back to
+  // confidence-only filtering when the caller didn't provide one.
+  const wordsToCorrect =
+    focusWords ??
+    request.wordConfidences
+      .filter(wc => wc.confidence < (request.confidenceThreshold || 0.7))
+      .map((wc, idx) => ({
+        word: wc.word,
+        confidence: wc.confidence,
+        position: idx,
+      }));
 
-  console.log(`  Low confidence words: ${lowConfidenceWords.length}`);
+  console.log(`  Words to correct: ${wordsToCorrect.length}`);
   console.log(`  Candidate terms: ${candidateTerms.length}`);
 
-  // If no low-confidence words or no candidate terms, return unchanged
-  if (lowConfidenceWords.length === 0 || candidateTerms.length === 0) {
+  // If no words to correct or no candidate terms, return unchanged
+  if (wordsToCorrect.length === 0 || candidateTerms.length === 0) {
     return {
       originalTranscript: request.transcript,
       correctedTranscript: request.transcript,
@@ -474,7 +482,7 @@ export async function processCorrection(
   // Try LLM correction, with rule-based fallback
   const result = await correctWithLLM(
     request.transcript,
-    lowConfidenceWords,
+    wordsToCorrect,
     candidateTerms,
     cfg
   );

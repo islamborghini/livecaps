@@ -10,6 +10,7 @@
 import { NextRequest } from "next/server";
 import { parseDocument } from "@/app/lib/documentParser";
 import { indexSessionContent, IndexProgressCallback } from "@/app/lib/vectorStore";
+import { setCachedSessionTerms } from "@/app/lib/sessionTermCache";
 import { ExtractedTerm } from "@/app/types/rag";
 import crypto from "crypto";
 
@@ -235,6 +236,10 @@ export async function POST(request: NextRequest) {
         };
 
         const result = await indexSessionContent(sessionId, terms, {}, onProgress);
+
+        // Cache the extracted terms in-process so subsequent correction
+        // requests don't have to wait for Upstash filter consistency.
+        setCachedSessionTerms(sessionId, terms);
 
         // Get category breakdown and sample terms
         const categoryBreakdown: Record<string, number> = {};

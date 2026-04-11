@@ -161,7 +161,6 @@ const App: () => JSX.Element = () => {
     isReady: isRAGReady,
     sessionId: ragSessionId,
     correct: ragCorrect,
-    shouldTriggerRAG,
   } = useRAG({ debug: false });
 
   // Uploaded files state - lifted from RAGUpload to persist across fullscreen toggle
@@ -192,6 +191,21 @@ const App: () => JSX.Element = () => {
 
   // Ref to store queueTranslation function for use in callbacks
   const queueTranslationRef = useRef<(blockId: string, text: string, targetLanguage: string) => void>(() => {});
+
+  // Refs mirroring RAG state/callbacks so the Deepgram transcript listener
+  // (which is registered once per connection and closes over its captured
+  // values) can always see the CURRENT isRAGReady and applyRAGCorrection.
+  // Without these, uploading a document after the listener was registered
+  // leaves the listener holding isRAGReady=false forever.
+  const isRAGReadyRef = useRef(false);
+  const applyRAGCorrectionRef = useRef<
+    (
+      blockId: string,
+      originalText: string,
+      wordConfidences: WordConfidence[] | undefined,
+      language: string
+    ) => void
+  >(() => {});
 
   /**
    * Detect the dominant (most frequent) language from detected languages array.
@@ -313,10 +327,17 @@ const App: () => JSX.Element = () => {
           queueTranslation(block.id, block.original.text, targetLang);
         });
 
-        // Apply RAG correction asynchronously (non-blocking)
-        if (isRAGReady) {
+        // Apply RAG correction asynchronously (non-blocking). Refs are used
+        // so uploads that happen after the Deepgram listener was registered
+        // still take effect.
+        if (isRAGReadyRef.current) {
           const dominantLang = detectDominantLanguage(bufferedLanguages);
-          applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
+          applyRAGCorrectionRef.current(
+            block.id,
+            block.original.text,
+            lastWordConfidences.current,
+            dominantLang
+          );
         }
 
         console.log(`📦 Flushed buffer (${textToProcess.length} chars, ${wordCount} words): "${textToProcess.substring(0, 50)}..."`);
@@ -736,20 +757,15 @@ const App: () => JSX.Element = () => {
       return;
     }
 
-    // Check if correction is needed (based on confidence or always for RAG)
-    // If no word confidences provided, generate low-confidence ones to trigger correction
+    // Generate confidences if missing. We no longer gate on Deepgram confidence
+    // here — a high-confidence mishearing like "Groq" → "rock" must still reach
+    // the server so the phonetic sweep against indexed session terms can catch it.
     const confidences = wordConfidences || originalText.split(/\s+/).map((word, i) => ({
       word,
-      confidence: 0.6, // Below threshold to trigger RAG
+      confidence: 0.6,
       start: i * 0.5,
       end: (i + 1) * 0.5,
     }));
-
-    // Check if any words need correction
-    if (!shouldTriggerRAG(confidences, 0.7)) {
-      console.log(`✅ RAG: All words high confidence, skipping correction for block ${blockId}`);
-      return;
-    }
 
     pendingRAGCorrections.current.add(blockId);
     console.log(`🔍 RAG: Correcting block ${blockId}: "${originalText.substring(0, 50)}..."`);
@@ -803,7 +819,17 @@ const App: () => JSX.Element = () => {
     } finally {
       pendingRAGCorrections.current.delete(blockId);
     }
-  }, [isRAGReady, isRAGEnabled, ragCorrect, shouldTriggerRAG, sessionLanguages.display]);
+  }, [isRAGReady, isRAGEnabled, ragCorrect, sessionLanguages.display]);
+
+  // Keep refs in sync with current RAG state/callback. This is what the
+  // transcript listener reads, so it always sees the latest values even
+  // though the listener itself is only registered once per connection.
+  useEffect(() => {
+    isRAGReadyRef.current = isRAGReady;
+  }, [isRAGReady]);
+  useEffect(() => {
+    applyRAGCorrectionRef.current = applyRAGCorrection;
+  }, [applyRAGCorrection]);
 
   /**
    * Handles winner transcript from multi-language detection mode
@@ -845,9 +871,14 @@ const App: () => JSX.Element = () => {
       queueTranslation(block.id, block.original.text, targetLang);
     });
 
-    if (isRAGReady) {
+    if (isRAGReadyRef.current) {
       const dominantLang = detectDominantLanguage(detectedLanguages);
-      applyRAGCorrection(block.id, block.original.text, undefined, dominantLang);
+      applyRAGCorrectionRef.current(
+        block.id,
+        block.original.text,
+        undefined,
+        dominantLang
+      );
     }
 
     // Clear any leftover state from the old buffered path
@@ -860,7 +891,7 @@ const App: () => JSX.Element = () => {
     // Clear interim text
     setCurrentInterimText("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionLanguages, createTranscriptBlock, isRAGReady, applyRAGCorrection, detectDominantLanguage]);
+  }, [sessionLanguages, createTranscriptBlock, detectDominantLanguage]);
 
   /**
    * Add translation to queue (non-blocking).
@@ -1002,9 +1033,17 @@ const App: () => JSX.Element = () => {
           queueTranslation(block.id, block.original.text, targetLang);
         });
 
-        if (isRAGReady) {
+        // Read RAG readiness and the correction callback from refs so that
+        // uploads that happen AFTER the listener was registered still take
+        // effect (the listener itself is registered once per connection).
+        if (isRAGReadyRef.current) {
           const dominantLang = detectDominantLanguage(detectedLanguages);
-          applyRAGCorrection(block.id, block.original.text, lastWordConfidences.current, dominantLang);
+          applyRAGCorrectionRef.current(
+            block.id,
+            block.original.text,
+            lastWordConfidences.current,
+            dominantLang
+          );
         }
 
         // Clear any leftover state from the old buffered path
