@@ -580,7 +580,7 @@ export function extractTerms(
     return scoreB - scoreA;
   });
 
-  console.log(`📊 Extracted ${terms.length} terms from ${sourceFile}`);
+  console.log(`Extracted ${terms.length} terms from ${sourceFile}`);
   console.log(`   Categories: ${Object.entries(
     terms.reduce((acc, t) => {
       acc[t.category || "unknown"] = (acc[t.category || "unknown"] || 0) + 1;

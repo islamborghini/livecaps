@@ -68,7 +68,7 @@ const getApiKey = async (): Promise<string> => {
 
     return result.key;
   } catch (error) {
-    console.error('❌ Failed to get API key:', error);
+    console.error('Failed to get API key:', error);
     throw error;
   }
 };
@@ -90,35 +90,35 @@ const DeepgramContextProvider: FunctionComponent<
    */
   const connectToDeepgram = async (options: LiveSchema, endpoint?: string) => {
     try {
-      console.log('🔄 Requesting Deepgram API key...');
+      console.log('Requesting Deepgram API key...');
       const key = await getApiKey();
 
       if (!key || key === 'build-time-placeholder') {
-        console.error('❌ Invalid Deepgram API key received');
+        console.error('Invalid Deepgram API key received');
         setConnectionState(LiveConnectionState.CLOSED);
         return;
       }
 
-      console.log('✅ API key received, length:', key.length);
-      console.log('🔄 Creating Deepgram client...');
+      console.log('API key received, length:', key.length);
+      console.log('Creating Deepgram client...');
       const deepgram = createClient(key);
 
-      console.log('🔄 Attempting to establish WebSocket connection with options:', options);
+      console.log('Attempting to establish WebSocket connection with options:', options);
       const conn = deepgram.listen.live(options, endpoint);
 
       conn.addListener(LiveTranscriptionEvents.Open, () => {
-        console.log('✅ Deepgram WebSocket connection opened successfully!');
+        console.log('Deepgram WebSocket connection opened successfully!');
         setConnectionState(LiveConnectionState.OPEN);
       });
 
       conn.addListener(LiveTranscriptionEvents.Close, (event: any) => {
-        console.log('❌ Deepgram WebSocket connection closed');
+        console.log('Deepgram WebSocket connection closed');
         console.log('Close event details:', event);
         setConnectionState(LiveConnectionState.CLOSED);
       });
 
       conn.addListener(LiveTranscriptionEvents.Error, (error: any) => {
-        console.error('❌ Deepgram WebSocket error details:');
+        console.error('Deepgram WebSocket error details:');
         console.error('Error type:', typeof error);
         console.error('Error object:', error);
         if (error?.message) {
@@ -130,10 +130,10 @@ const DeepgramContextProvider: FunctionComponent<
         setConnectionState(LiveConnectionState.CLOSED);
       });
 
-      console.log('✅ WebSocket listeners configured, setting connection...');
+      console.log('WebSocket listeners configured, setting connection...');
       setConnection(conn);
     } catch (error) {
-      console.error('❌ Failed to connect to Deepgram:');
+      console.error('Failed to connect to Deepgram:');
       console.error('Error type:', typeof error);
       console.error('Error details:', error);
       if (error instanceof Error) {

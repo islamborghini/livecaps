@@ -1,3 +1,11 @@
+/**
+ * POST /api/usage/sync
+ *
+ * Increments today's usage record by the given secondsUsed value (0–120 per
+ * call). Called every 30 seconds by UsageContextProvider while the timer is
+ * running, and also via navigator.sendBeacon on tab close. Upserts the daily
+ * UsageRecord row and returns the updated remaining seconds.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser } from "@/app/lib/auth";

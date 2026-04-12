@@ -1,3 +1,13 @@
+/**
+ * GET /api/authenticate
+ *
+ * Issues a short-lived (60-second) Deepgram API key so the long-lived
+ * DEEPGRAM_API_KEY never reaches the browser. The key is scoped to
+ * "usage:write" only and expires automatically on Deepgram's side.
+ *
+ * In development, returns the raw env key directly to skip the
+ * project-management API round-trip.
+ */
 import { DeepgramError, createClient } from "@deepgram/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -9,14 +19,14 @@ export async function GET(request: NextRequest) {
     const apiKey = process.env.DEEPGRAM_API_KEY;
 
     if (!apiKey || apiKey.trim() === '') {
-      console.error('❌ DEEPGRAM_API_KEY is not set in environment variables');
+      console.error('DEEPGRAM_API_KEY is not set in environment variables');
       return NextResponse.json({
         error: 'DEEPGRAM_API_KEY is not configured',
         message: 'Please add your Deepgram API key to the .env.local file'
       }, { status: 500 });
     }
 
-    console.log('✅ Using development API key from environment');
+    console.log('Using development API key from environment');
     console.log('API key prefix:', apiKey.substring(0, 10) + '...');
     console.log('API key length:', apiKey.length);
     return NextResponse.json({

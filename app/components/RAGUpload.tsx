@@ -225,7 +225,7 @@ export function RAGUpload({
                 } else if (data.type === "complete" && data.data) {
                   const result = data.data as UploadResult;
                   
-                  console.log("🔍 Complete data received:", JSON.stringify(result, null, 2));
+                  console.log("Complete data received:", JSON.stringify(result, null, 2));
                   
                   // Add to uploaded files list
                   const newFile: UploadedFile = {
@@ -242,7 +242,7 @@ export function RAGUpload({
                   
                   // Auto-show debug panel when terms are indexed
                   if (result.terms?.samples && Object.keys(result.terms.samples).length > 0) {
-                    console.log("✅ File uploaded:", file.name, "with", result.terms.indexed, "terms");
+                    console.log("File uploaded:", file.name, "with", result.terms.indexed, "terms");
                     setShowDebug(true);
                   }
                   
@@ -573,13 +573,12 @@ export function RAGUpload({
         {showDebug && (
           <div className="absolute top-full left-0 mt-2 z-50 w-80 max-h-[28rem] overflow-auto rounded-lg bg-gray-900 text-gray-100 shadow-2xl border border-gray-700 text-xs font-mono">
             <div className="sticky top-0 flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-              <span className="font-semibold text-teal-400">📚 Uploaded Files ({uploadedFiles.length}/{MAX_FILES})</span>
+              <span className="font-semibold text-teal-400">Uploaded Files ({uploadedFiles.length}/{MAX_FILES})</span>
               <button
                 onClick={() => setShowDebug(false)}
                 className="text-gray-400 hover:text-white"
               >
-                ✕
-              </button>
+                              </button>
             </div>
             
             {/* File List */}

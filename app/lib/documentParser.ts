@@ -53,7 +53,7 @@ async function extractTextFromPDF(buffer: Buffer): Promise<string> {
     // Use the parsePDF helper which handles dynamic import
     return await parsePDF(buffer);
   } catch (error) {
-    console.error("❌ PDF parsing error:", error);
+    console.error("PDF parsing error:", error);
     throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
@@ -65,11 +65,11 @@ async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
   try {
     const result = await mammoth.extractRawText({ buffer });
     if (result.messages.length > 0) {
-      console.warn("⚠️ DOCX parsing warnings:", result.messages);
+      console.warn("DOCX parsing warnings:", result.messages);
     }
     return result.value || "";
   } catch (error) {
-    console.error("❌ DOCX parsing error:", error);
+    console.error("DOCX parsing error:", error);
     throw new Error(`Failed to parse DOCX: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
@@ -128,10 +128,10 @@ async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
     }
     
     const result = textParts.join("\n\n");
-    console.log(`📊 PPTX: Extracted ${result.length} chars from ${slideFiles.length} slides`);
+    console.log(`PPTX: Extracted ${result.length} chars from ${slideFiles.length} slides`);
     return result;
   } catch (error) {
-    console.error("❌ PPTX parsing error:", error);
+    console.error("PPTX parsing error:", error);
     throw new Error(`Failed to parse PPTX: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
@@ -144,7 +144,7 @@ export async function extractTextFromFile(
   mimeType: string,
   fileName: string
 ): Promise<string> {
-  console.log(`📄 Extracting text from ${fileName} (${mimeType})`);
+  console.log(`Extracting text from ${fileName} (${mimeType})`);
 
   switch (mimeType) {
     case SUPPORTED_MIME_TYPES.PDF:
@@ -162,7 +162,7 @@ export async function extractTextFromFile(
 
     default:
       // Try to handle as plain text
-      console.warn(`⚠️ Unknown MIME type ${mimeType}, attempting plain text extraction`);
+      console.warn(`Unknown MIME type ${mimeType}, attempting plain text extraction`);
       return buffer.toString("utf-8");
   }
 }
@@ -216,7 +216,7 @@ export async function parseDocument(
     const terms = extractTermsFromText(rawText, fileName);
     
     const processingTimeMs = Date.now() - startTime;
-    console.log(`✅ Parsed ${fileName} in ${processingTimeMs}ms: ${rawText.length} chars, ${terms.length} terms`);
+    console.log(`Parsed ${fileName} in ${processingTimeMs}ms: ${rawText.length} chars, ${terms.length} terms`);
     
     return {
       fileName,
@@ -231,7 +231,7 @@ export async function parseDocument(
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`❌ Failed to parse ${fileName}:`, errorMessage);
+    console.error(`Failed to parse ${fileName}:`, errorMessage);
     
     return {
       fileName,

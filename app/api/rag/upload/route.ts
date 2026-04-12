@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 415 });
     }
 
-    console.log(`📄 Processing upload: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+    console.log(`Processing upload: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
 
     // Generate or use provided session ID
     const sessionId = customSessionId || generateSessionId();
@@ -173,16 +173,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📝 Parsed ${parsedContent.rawText.length} characters from ${file.name}`);
+    console.log(`Parsed ${parsedContent.rawText.length} characters from ${file.name}`);
 
     // Use pre-extracted terms from document parser, or extract separately
     let terms: ExtractedTerm[] = parsedContent.terms || [];
 
-    console.log(`🔍 Extracted ${terms.length} terms from ${file.name}`);
+    console.log(`Extracted ${terms.length} terms from ${file.name}`);
 
     // Limit terms to prevent overwhelming the vector store
     if (terms.length > MAX_TERMS_TO_INDEX) {
-      console.log(`⚠️ Limiting terms from ${terms.length} to ${MAX_TERMS_TO_INDEX}`);
+      console.log(`Limiting terms from ${terms.length} to ${MAX_TERMS_TO_INDEX}`);
       
       // Sort by frequency and prioritize proper nouns
       terms.sort((a, b) => {
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
     try {
       const result = await indexSessionContent(sessionId, terms);
       indexedCount = result.indexed;
-      console.log(`✅ Indexed ${indexedCount} terms for session ${sessionId}`);
+      console.log(`Indexed ${indexedCount} terms for session ${sessionId}`);
     } catch (indexError) {
       console.error("Indexing error:", indexError);
       return NextResponse.json(
@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    console.log(`✨ Upload complete for ${file.name} in ${processingTimeMs}ms`);
+    console.log(`Upload complete for ${file.name} in ${processingTimeMs}ms`);
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {

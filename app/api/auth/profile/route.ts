@@ -1,3 +1,11 @@
+/**
+ * GET  /api/auth/profile — full profile with lifetime usage stats (total
+ *   seconds used and session count across all days).
+ *
+ * PATCH /api/auth/profile — update display name or password. For a password
+ *   change, the current password must be supplied. On success, re-issues the
+ *   JWT cookie with the updated name so the UI reflects the change immediately.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser, hashPassword, verifyPassword, createToken, setAuthCookie } from "@/app/lib/auth";

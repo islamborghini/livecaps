@@ -1,3 +1,11 @@
+/**
+ * POST /api/stripe/checkout
+ *
+ * Creates a Stripe Checkout session for a subscription upgrade (PAID or PRO).
+ * Lazily creates a Stripe Customer if this user doesn't have one yet and
+ * stores the resulting customerId on the user row for future portal access.
+ * Returns the hosted checkout URL which the client should redirect to.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser } from "@/app/lib/auth";

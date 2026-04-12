@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
         const categoryBreakdown: Record<string, number> = {};
         const sampleTerms: Record<string, string[]> = {};
         
-        console.log(`📝 Building sample terms from ${terms.length} terms...`);
+        console.log(`Building sample terms from ${terms.length} terms...`);
         
         for (const term of terms) {
           const category = term.category || "other";
@@ -258,8 +258,8 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        console.log(`📊 Sample terms:`, JSON.stringify(sampleTerms, null, 2));
-        console.log(`📊 Categories:`, JSON.stringify(categoryBreakdown, null, 2));
+        console.log(`Sample terms:`, JSON.stringify(sampleTerms, null, 2));
+        console.log(`Categories:`, JSON.stringify(categoryBreakdown, null, 2));
 
         const processingTimeMs = Date.now() - startTime;
 
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        console.log(`✨ Streaming upload complete for ${file.name} in ${processingTimeMs}ms`);
+        console.log(`Streaming upload complete for ${file.name} in ${processingTimeMs}ms`);
       } catch (error) {
         console.error("Upload stream error:", error);
         sendProgress({

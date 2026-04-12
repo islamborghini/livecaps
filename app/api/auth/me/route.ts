@@ -1,3 +1,10 @@
+/**
+ * GET /api/auth/me
+ *
+ * Returns the current user's public fields (id, email, name, tier).
+ * Fetches a fresh row from the DB so tier changes (e.g. after a Stripe
+ * webhook) are reflected without requiring a new login.
+ */
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser } from "@/app/lib/auth";

@@ -1,3 +1,11 @@
+/**
+ * GET /api/usage/remaining
+ *
+ * Returns the current user's daily usage for today (UTC date) and how many
+ * seconds they have left based on their tier. Fetches a fresh tier from the DB
+ * rather than trusting the JWT, so upgrades are reflected immediately.
+ * PRO users get secondsRemaining: null (unlimited).
+ */
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser } from "@/app/lib/auth";

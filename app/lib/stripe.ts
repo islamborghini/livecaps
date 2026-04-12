@@ -1,3 +1,14 @@
+/**
+ * Stripe client setup for LiveCaps.
+ *
+ * `getStripe()` lazily initialises the Stripe SDK so that missing env vars
+ * throw at call time rather than at module load (which would break builds).
+ * The `stripe` export is a Proxy that delegates every property access to
+ * `getStripe()`, kept for ergonomic use throughout the codebase.
+ *
+ * `TIER_PRICE_IDS` maps subscription tiers to Stripe Price IDs set via
+ * STRIPE_PRICE_PAID / STRIPE_PRICE_PRO env vars.
+ */
 import Stripe from "stripe";
 
 let _stripe: Stripe | null = null;

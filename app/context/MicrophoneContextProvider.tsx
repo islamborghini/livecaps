@@ -88,7 +88,7 @@ const MicrophoneContextProvider: React.FC<MicrophoneContextProviderProps> = ({
         throw new Error('Your browser does not support microphone access');
       }
 
-      console.log('🎤 Requesting microphone permission...');
+      console.log('Requesting microphone permission...');
       const userMedia = await navigator.mediaDevices.getUserMedia({
         audio: {
           noiseSuppression: true,
@@ -125,11 +125,11 @@ const MicrophoneContextProvider: React.FC<MicrophoneContextProviderProps> = ({
 
       const microphone = new MediaRecorder(userMedia, options);
 
-      console.log('✅ Microphone ready');
+      console.log('Microphone ready');
       setMicrophoneState(MicrophoneState.Ready);
       setMicrophone(microphone);
     } catch (err: any) {
-      console.error('❌ Microphone setup failed:', err);
+      console.error('Microphone setup failed:', err);
       setMicrophoneState(MicrophoneState.Error);
       
       // Provide user-friendly error messages
@@ -148,7 +148,7 @@ const MicrophoneContextProvider: React.FC<MicrophoneContextProviderProps> = ({
   };
 
   const retrySetup = useCallback(() => {
-    console.log('🔄 Retrying microphone setup...');
+    console.log('Retrying microphone setup...');
     setMicrophoneState(MicrophoneState.NotSetup);
     setErrorMessage(null);
     setMicrophone(null);

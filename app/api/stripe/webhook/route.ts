@@ -1,3 +1,14 @@
+/**
+ * POST /api/stripe/webhook
+ *
+ * Receives and verifies signed Stripe webhook events. Handles:
+ *   - checkout.session.completed  — upgrades the user's tier to PAID or PRO
+ *   - customer.subscription.deleted — downgrades the user back to FREE
+ *   - invoice.payment_failed — logs the failure (no tier change)
+ *
+ * The STRIPE_WEBHOOK_SECRET env var must match the secret shown in the Stripe
+ * Dashboard (or CLI) for the webhook endpoint.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { stripe } from "@/app/lib/stripe";
@@ -40,7 +51,7 @@ export async function POST(req: NextRequest) {
             where: { id: userId },
             data: { tier: tier as "PAID" | "PRO" },
           });
-          console.log(`✅ User ${userId} upgraded to ${tier}`);
+          console.log(`User ${userId} upgraded to ${tier}`);
         }
         break;
       }
@@ -58,7 +69,7 @@ export async function POST(req: NextRequest) {
             where: { id: user.id },
             data: { tier: "FREE" },
           });
-          console.log(`⬇️ User ${user.id} downgraded to FREE (subscription cancelled)`);
+          console.log(`User ${user.id} downgraded to FREE (subscription cancelled)`);
         }
         break;
       }
@@ -66,7 +77,7 @@ export async function POST(req: NextRequest) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
-        console.warn(`⚠️ Payment failed for customer ${customerId}`);
+        console.warn(`Payment failed for customer ${customerId}`);
         break;
       }
     }

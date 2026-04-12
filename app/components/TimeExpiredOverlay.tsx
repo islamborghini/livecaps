@@ -1,3 +1,10 @@
+/**
+ * TimeExpiredOverlay — full-area overlay shown when the user's daily limit is reached.
+ *
+ * Renders only when isTimeExpired is true. Displays a blurred backdrop over the
+ * caption area with a message showing the tier-appropriate limit (20 min / 3 h)
+ * and a note that the limit resets at midnight UTC.
+ */
 "use client";
 
 import { useUsage } from "../context/UsageContextProvider";

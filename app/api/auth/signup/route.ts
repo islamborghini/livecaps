@@ -1,3 +1,11 @@
+/**
+ * POST /api/auth/signup
+ *
+ * Creates a new user account. Requires a valid invite code (INVITE_CODE env
+ * var) — registration is closed to the public without it. Password is hashed
+ * with bcrypt before storage. On success, issues a session cookie and returns
+ * the new user object.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { hashPassword, createToken, setAuthCookie } from "@/app/lib/auth";

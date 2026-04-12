@@ -189,12 +189,12 @@ export async function POST(request: NextRequest) {
         : undefined,
     };
 
-    console.log(`🔧 RAG Correction request for session ${sessionId}: "${transcript.substring(0, 50)}..."`);
+    console.log(`RAG Correction request for session ${sessionId}: "${transcript.substring(0, 50)}..."`);
 
     // Call the corrector
     const response = await correctTranscript(correctionRequest);
 
-    console.log(`✅ RAG Correction complete: ${response.wasModified ? "modified" : "unchanged"} (${response.processingTimeMs}ms)`);
+    console.log(`RAG Correction complete: ${response.wasModified ? "modified" : "unchanged"} (${response.processingTimeMs}ms)`);
 
     return NextResponse.json(response);
 

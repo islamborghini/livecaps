@@ -1,3 +1,10 @@
+/**
+ * POST /api/stripe/portal
+ *
+ * Creates a Stripe Billing Portal session for an existing customer so they can
+ * manage or cancel their subscription without leaving the app. Requires a
+ * stripeCustomerId on the user row (set during checkout). Returns the portal URL.
+ */
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser } from "@/app/lib/auth";

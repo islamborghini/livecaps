@@ -59,12 +59,12 @@ export function selectWinnerByConfidence(
   );
 
   if (validResults.length === 0) {
-    console.warn("⚠️ No valid results to compare (all below threshold or empty)");
+    console.warn("No valid results to compare (all below threshold or empty)");
     return null;
   }
 
   // Log all results for debugging
-  console.log("🔍 Comparing transcript results:");
+  console.log("Comparing transcript results:");
   validResults.forEach((result) => {
     console.log(
       `  - [${result.language}] confidence=${result.confidence.toFixed(3)}: "${result.transcript.substring(0, 50)}${result.transcript.length > 50 ? "..." : ""}"`
@@ -95,12 +95,12 @@ export function selectWinnerByConfidence(
       mergedConfig.SIGNIFICANT_DIFFERENCE_THRESHOLD;
 
   console.log(
-    `🏆 Winner: [${winner.language}] confidence=${winner.confidence.toFixed(3)} ${isSignificantWin ? "(significant)" : "(marginal)"}`
+    `Winner: [${winner.language}] confidence=${winner.confidence.toFixed(3)} ${isSignificantWin ? "(significant)" : "(marginal)"}`
   );
 
   if (runnerUp) {
     console.log(
-      `🥈 Runner-up: [${runnerUp.language}] confidence=${runnerUp.confidence.toFixed(3)}, diff=${(winner.confidence - runnerUp.confidence).toFixed(3)}`
+      `Runner-up: [${runnerUp.language}] confidence=${runnerUp.confidence.toFixed(3)}, diff=${(winner.confidence - runnerUp.confidence).toFixed(3)}`
     );
   }
 
@@ -151,7 +151,7 @@ export class TranscriptBuffer {
     );
 
     console.log(
-      `📥 Buffering result from [${result.language}] (key=${bufferKey}, isFinal=${result.isFinal})`
+      `Buffering result from [${result.language}] (key=${bufferKey}, isFinal=${result.isFinal})`
     );
 
     // Get or create buffer for this time window
@@ -176,7 +176,7 @@ export class TranscriptBuffer {
     // If all expected connections have responded, flush immediately
     if (buffered.results.length >= this.expectedConnectionCount) {
       console.log(
-        `⚡ All ${this.expectedConnectionCount} connections responded, flushing immediately`
+        `All ${this.expectedConnectionCount} connections responded, flushing immediately`
       );
       this.flushBuffer(bufferKey);
     }
@@ -193,7 +193,7 @@ export class TranscriptBuffer {
     }
 
     console.log(
-      `🔄 Flushing buffer ${bufferKey} with ${buffered.results.length} results`
+      `Flushing buffer ${bufferKey} with ${buffered.results.length} results`
     );
 
     // Clear timeout if it exists
@@ -207,7 +207,7 @@ export class TranscriptBuffer {
     if (winner) {
       this.onWinnerSelected(winner);
     } else {
-      console.warn("⚠️ No winner selected from buffer");
+      console.warn("No winner selected from buffer");
     }
 
     // Remove buffer
@@ -218,7 +218,7 @@ export class TranscriptBuffer {
    * Flushes all buffers (useful for cleanup or language change)
    */
   flushAll(): void {
-    console.log(`🧹 Flushing all buffers (${this.buffer.size} active)`);
+    console.log(`Flushing all buffers (${this.buffer.size} active)`);
 
     this.buffer.forEach((_, bufferKey) => {
       this.flushBuffer(bufferKey);
@@ -229,7 +229,7 @@ export class TranscriptBuffer {
    * Updates the expected connection count (when connections change)
    */
   updateExpectedCount(count: number): void {
-    console.log(`🔢 Updating expected connection count: ${this.expectedConnectionCount} → ${count}`);
+    console.log(`Updating expected connection count: ${this.expectedConnectionCount} → ${count}`);
     this.expectedConnectionCount = count;
   }
 
@@ -237,7 +237,7 @@ export class TranscriptBuffer {
    * Clears all buffers without flushing (hard reset)
    */
   clear(): void {
-    console.log(`🗑️ Clearing all buffers (${this.buffer.size} active)`);
+    console.log(`Clearing all buffers (${this.buffer.size} active)`);
 
     this.buffer.forEach((buffered) => {
       if (buffered.timeoutHandle) {

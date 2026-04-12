@@ -1,3 +1,10 @@
+/**
+ * POST /api/auth/login
+ *
+ * Authenticates a user with email + password. On success, issues a 7-day
+ * HttpOnly JWT cookie and returns the public user object. Returns 401 for
+ * unknown email or wrong password (same message to prevent user enumeration).
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { verifyPassword, createToken, setAuthCookie } from "@/app/lib/auth";

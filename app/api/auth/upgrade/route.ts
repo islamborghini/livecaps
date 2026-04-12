@@ -1,3 +1,10 @@
+/**
+ * POST /api/auth/upgrade
+ *
+ * Legacy endpoint kept for backward compatibility. Direct tier upgrades are no
+ * longer handled here — all billing goes through Stripe. Returns a 302-like
+ * JSON response directing callers to /api/stripe/checkout.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/app/lib/auth";
 

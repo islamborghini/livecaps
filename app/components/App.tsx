@@ -120,7 +120,7 @@ const App: () => JSX.Element = () => {
         try {
           const parsed = JSON.parse(saved);
           setSessionLanguages(parsed);
-          console.log('📂 Loaded languages from localStorage:', parsed);
+          console.log('Loaded languages from localStorage:', parsed);
         } catch (e) {
           console.error('Failed to parse saved languages:', e);
         }
@@ -130,7 +130,7 @@ const App: () => JSX.Element = () => {
       const savedMode = localStorage.getItem('transcriptionMode') as TranscriptionMode;
       if (savedMode === 'single' || savedMode === 'multi-detect') {
         setTranscriptionMode(savedMode);
-        console.log('📂 Loaded transcription mode from localStorage:', savedMode);
+        console.log('Loaded transcription mode from localStorage:', savedMode);
       }
 
       setHasLoadedFromStorage(true);
@@ -340,14 +340,14 @@ const App: () => JSX.Element = () => {
           );
         }
 
-        console.log(`📦 Flushed buffer (${textToProcess.length} chars, ${wordCount} words): "${textToProcess.substring(0, 50)}..."`);
+        console.log(`Flushed buffer (${textToProcess.length} chars, ${wordCount} words): "${textToProcess.substring(0, 50)}..."`);
       } else {
         // Not enough content, put it back in buffer
         currentSentenceBuffer.current = { 
           text: textToProcess.replace(/\.$/, '') + " " + remainingText, 
           languages: bufferedLanguages 
         };
-        console.log(`⏳ Buffer too short (${wordCount} words), continuing to accumulate...`);
+        console.log(`Buffer too short (${wordCount} words), continuing to accumulate...`);
       }
     }
   };
@@ -359,7 +359,7 @@ const App: () => JSX.Element = () => {
 
   // Connect to Deepgram when microphone is ready
   useEffect(() => {
-    console.log('🔍 Connection effect triggered:', {
+    console.log('Connection effect triggered:', {
       microphoneState,
       isMultiMode,
       connectionState,
@@ -370,7 +370,7 @@ const App: () => JSX.Element = () => {
 
     // Don't connect until we've loaded settings from storage
     if (!hasLoadedFromStorage) {
-      console.log('⏸️ Waiting for localStorage to load before connecting');
+      console.log('Waiting for localStorage to load before connecting');
       return;
     }
 
@@ -378,7 +378,7 @@ const App: () => JSX.Element = () => {
     if (microphoneState === MicrophoneState.Ready && connectionState === LiveConnectionState.CLOSED) {
       const connectBasedOnMode = async () => {
         // isMultiMode already accounts for spoken languages count
-        console.log('🔍 Deciding connection mode:', {
+        console.log('Deciding connection mode:', {
           isMultiMode,
           spokenLanguagesCount: sessionLanguages.spoken.length,
           willUseMulti: isMultiMode
@@ -386,21 +386,21 @@ const App: () => JSX.Element = () => {
 
         if (isMultiMode) {
           // Multi-language detection mode - use parallel connections
-          console.log(`🌐 Multi-Language Detection Mode: Creating ${sessionLanguages.spoken.length} parallel connections`);
-          console.log(`📍 Languages: ${sessionLanguages.spoken.join(', ')}`);
+          console.log(`Multi-Language Detection Mode: Creating ${sessionLanguages.spoken.length} parallel connections`);
+          console.log(`Languages: ${sessionLanguages.spoken.join(', ')}`);
 
           try {
             await multiContext.connectToDeepgram(sessionLanguages.spoken);
-            console.log('✅ All parallel connections established');
+            console.log('All parallel connections established');
           } catch (error) {
-            console.error('❌ Failed to establish parallel connections:', error);
+            console.error('Failed to establish parallel connections:', error);
           }
         } else {
           // Single language mode - use specific language for better accuracy
           const languageParam = sessionLanguages.spoken[0] || "en";
           const modelParam = "nova-3"; // Nova-3 supports 30+ languages with better accuracy
 
-          console.log(`🎯 Single Language Mode: ${languageParam} with ${modelParam}`);
+          console.log(`Single Language Mode: ${languageParam} with ${modelParam}`);
 
           const connectionOptions = {
             model: modelParam,
@@ -413,21 +413,21 @@ const App: () => JSX.Element = () => {
             vad_events: true,
           };
 
-          console.log('🎤 Connecting to Deepgram with options:', connectionOptions);
-          console.log('🌍 Session languages - Speaking:', sessionLanguages.spoken, 'Display:', sessionLanguages.display);
+          console.log('Connecting to Deepgram with options:', connectionOptions);
+          console.log('Session languages - Speaking:', sessionLanguages.spoken, 'Display:', sessionLanguages.display);
 
           try {
             await singleContext.connectToDeepgram(connectionOptions);
-            console.log('✅ Single connection established');
+            console.log('Single connection established');
           } catch (error) {
-            console.error('❌ Failed to establish single connection:', error);
+            console.error('Failed to establish single connection:', error);
           }
         }
       };
 
       connectBasedOnMode();
     } else {
-      console.log('⏸️ Not connecting - Microphone:', microphoneState, 'Connection:', connectionState);
+      console.log('Not connecting - Microphone:', microphoneState, 'Connection:', connectionState);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microphoneState, isMultiMode, connectionState, hasLoadedFromStorage]);
@@ -436,7 +436,7 @@ const App: () => JSX.Element = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && hasLoadedFromStorage) {
       localStorage.setItem('livecaps_languages', JSON.stringify(sessionLanguages));
-      console.log('💾 Saved languages to localStorage:', sessionLanguages);
+      console.log('Saved languages to localStorage:', sessionLanguages);
     }
   }, [sessionLanguages, hasLoadedFromStorage]);
 
@@ -447,7 +447,7 @@ const App: () => JSX.Element = () => {
 
     // Only disconnect if already connected - the main connection effect will handle reconnection
     if (connectionState === LiveConnectionState.OPEN) {
-      console.log('🔄 Transcription mode changed while connected, disconnecting...', {
+      console.log('Transcription mode changed while connected, disconnecting...', {
         newMode: transcriptionMode,
         isMultiMode,
         spokenLanguages: sessionLanguages.spoken
@@ -467,9 +467,9 @@ const App: () => JSX.Element = () => {
       processedFinalTexts.current.clear();
 
       // Main connection effect will handle reconnection automatically
-      console.log('⏳ Main connection effect will handle reconnection...');
+      console.log('Main connection effect will handle reconnection...');
     } else {
-      console.log('⏭️ Mode changed but not connected - main connection effect will handle connection');
+      console.log('Mode changed but not connected - main connection effect will handle connection');
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -531,11 +531,13 @@ const App: () => JSX.Element = () => {
     });
   }, [sessionLanguages.display]);
 
-  // Pause: stop feeding audio to Deepgram but keep the WebSocket alive
-  // (the keepAlive effect takes over while mic is not Open).
+  /**
+   * Pauses transcription without closing the Deepgram WebSocket.
+   * Flushes the sentence buffer first so no in-flight content is lost.
+   * The keepAlive effect takes over and pings Deepgram every 10 s while paused.
+   */
   const handlePause = () => {
-    console.log('⏸️ Pause triggered');
-    // Flush any pending buffered content so nothing is lost across the pause
+    console.log('Pause triggered');
     if (bufferTimeout.current) {
       clearTimeout(bufferTimeout.current);
       bufferTimeout.current = null;
@@ -543,29 +545,38 @@ const App: () => JSX.Element = () => {
     stopMicrophone();
   };
 
-  // Resume: if connection is still OPEN we only need to resume the mic;
-  // otherwise fall through to a full reconnect.
+  /**
+   * Resumes transcription after a pause or unexpected disconnect.
+   * - If the socket is still OPEN (normal pause): just resumes the MediaRecorder.
+   * - If the socket is CLOSED (network drop, etc.): delegates to handleManualReconnect
+   *   which rebuilds the Deepgram session from scratch.
+   */
   const handleResume = async () => {
     if (
       connectionState === LiveConnectionState.OPEN &&
       (microphoneState === MicrophoneState.Paused ||
         microphoneState === MicrophoneState.Pausing)
     ) {
-      console.log('▶️ Resume triggered (socket still open, restarting mic)');
+      console.log('Resume triggered (socket still open, restarting mic)');
       startMicrophone();
       return;
     }
     await handleManualReconnect();
   };
 
-  // Manual reconnect function
+  /**
+   * Tears down any stale Deepgram connection, pauses the MediaRecorder if it
+   * was still running, then opens a fresh session with the current language config.
+   * Committed transcript blocks are preserved; only interim/buffer state is cleared.
+   * Guards against concurrent calls via isReconnecting ref.
+   */
   const handleManualReconnect = async () => {
     if (isReconnecting.current || connectionState === LiveConnectionState.CONNECTING) {
-      console.log('⏳ Already reconnecting, please wait...');
+      console.log('Already reconnecting, please wait...');
       return;
     }
 
-    console.log('🔄 Manual reconnect triggered');
+    console.log('Manual reconnect triggered');
     isReconnecting.current = true;
 
     // First disconnect any existing connections
@@ -598,11 +609,11 @@ const App: () => JSX.Element = () => {
 
     try {
       if (isMultiMode) {
-        console.log(`🌐 Reconnecting in multi-language mode with ${sessionLanguages.spoken.length} languages`);
+        console.log(`Reconnecting in multi-language mode with ${sessionLanguages.spoken.length} languages`);
         await multiContext.connectToDeepgram(sessionLanguages.spoken);
       } else {
         const languageParam = sessionLanguages.spoken[0] || "en";
-        console.log(`🎯 Reconnecting in single-language mode: ${languageParam}`);
+        console.log(`Reconnecting in single-language mode: ${languageParam}`);
 
         const connectionOptions = {
           model: "nova-3",
@@ -617,9 +628,9 @@ const App: () => JSX.Element = () => {
 
         await singleContext.connectToDeepgram(connectionOptions);
       }
-      console.log('✅ Reconnected successfully');
+      console.log('Reconnected successfully');
     } catch (error) {
-      console.error('❌ Failed to reconnect:', error);
+      console.error('Failed to reconnect:', error);
     } finally {
       setTimeout(() => {
         isReconnecting.current = false;
@@ -704,7 +715,7 @@ const App: () => JSX.Element = () => {
         const item = translationQueue.current.shift();
         if (!item) break;
 
-        console.log(`🔄 Translating block ${item.blockId} to ${item.targetLanguage}`);
+        console.log(`Translating block ${item.blockId} to ${item.targetLanguage}`);
 
         // Translate the text
         const translation = await translateText(item.text, item.targetLanguage);
@@ -766,7 +777,7 @@ const App: () => JSX.Element = () => {
     }));
 
     pendingRAGCorrections.current.add(blockId);
-    console.log(`🔍 RAG: Correcting block ${blockId}: "${originalText.substring(0, 50)}..."`);
+    console.log(`RAG: Correcting block ${blockId}: "${originalText.substring(0, 50)}..."`);
 
     try {
       const result = await ragCorrect(originalText, confidences, {
@@ -776,7 +787,7 @@ const App: () => JSX.Element = () => {
 
       // Check if correction changed the text
       if (result.wasModified && result.correctedTranscript !== originalText) {
-        console.log(`✨ RAG: Correction applied to block ${blockId}`);
+        console.log(`RAG: Correction applied to block ${blockId}`);
         console.log(`   Original: "${originalText.substring(0, 60)}..."`);
         console.log(`   Corrected: "${result.correctedTranscript.substring(0, 60)}..."`);
         console.log(`   Corrections:`, result.corrections);
@@ -810,10 +821,10 @@ const App: () => JSX.Element = () => {
           queueTranslationRef.current(blockId, result.correctedTranscript, targetLang);
         });
       } else {
-        console.log(`📝 RAG: No changes needed for block ${blockId}`);
+        console.log(`RAG: No changes needed for block ${blockId}`);
       }
     } catch (error) {
-      console.error(`❌ RAG: Correction failed for block ${blockId}:`, error);
+      console.error(`RAG: Correction failed for block ${blockId}:`, error);
     } finally {
       pendingRAGCorrections.current.delete(blockId);
     }
@@ -834,7 +845,7 @@ const App: () => JSX.Element = () => {
    * Processes the winning transcript similar to single-mode transcript handling
    */
   const handleWinnerTranscript = useCallback((winner: WinnerTranscript) => {
-    console.log(`🏆 Winner transcript: [${winner.language}] confidence=${winner.confidence.toFixed(3)} "${winner.transcript}"`);
+    console.log(`Winner transcript: [${winner.language}] confidence=${winner.confidence.toFixed(3)} "${winner.transcript}"`);
 
     if (!winner.isFinal) {
       // Show interim result
@@ -844,13 +855,13 @@ const App: () => JSX.Element = () => {
 
     // Skip empty transcripts
     if (winner.transcript.trim() === "") {
-      console.log('⚠️ Empty winner transcript, ignoring');
+      console.log('Empty winner transcript, ignoring');
       return;
     }
 
     // Prevent duplicate processing
     if (processedFinalTexts.current.has(winner.transcript)) {
-      console.log('⚠️ Duplicate winner transcript, ignoring');
+      console.log('Duplicate winner transcript, ignoring');
       return;
     }
 
@@ -920,7 +931,9 @@ const App: () => JSX.Element = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep queueTranslationRef updated
+  // Mirror queueTranslation into a ref so the Deepgram transcript listener
+  // (registered once per connection) always calls the latest version even
+  // after dependencies like sessionLanguages change.
   useEffect(() => {
     queueTranslationRef.current = queueTranslation;
   }, [queueTranslation]);
@@ -945,7 +958,7 @@ const App: () => JSX.Element = () => {
             singleContext.connection?.send(e.data);
           }
         } catch (error) {
-          console.warn('⚠️ Failed to send audio data:', error);
+          console.warn('Failed to send audio data:', error);
         }
       }
     };
@@ -976,14 +989,14 @@ const App: () => JSX.Element = () => {
 
       // Debug: Log the full alternative object to see what we're getting
       if (isFinal) {
-        console.log('🔍 Full Deepgram response alternative:', JSON.stringify(alternative, null, 2));
+        console.log('Full Deepgram response alternative:', JSON.stringify(alternative, null, 2));
       }
 
       // Also check for channel-level detected language (fallback)
       const channelLanguage = (data.channel as any).detected_language || (data as any).detected_language;
       if (channelLanguage && !detectedLanguages.includes(channelLanguage)) {
         detectedLanguages.push(channelLanguage);
-        console.log(`📡 Channel-level language detected: ${channelLanguage}`);
+        console.log(`Channel-level language detected: ${channelLanguage}`);
       }
 
       // Extract per-word languages
@@ -995,11 +1008,11 @@ const App: () => JSX.Element = () => {
 
       // Debug logging for language detection
       if (isFinal) {
-        console.log(`📝 Final transcript: "${thisCaption.substring(0, 50)}${thisCaption.length > 50 ? '...' : ''}"`);
-        console.log(`🔍 Detected languages: [${detectedLanguages.length > 0 ? detectedLanguages.join(', ') : 'none detected'}]`);
-        console.log(`📊 Words array length: ${words.length}`);
+        console.log(`Final transcript: "${thisCaption.substring(0, 50)}${thisCaption.length > 50 ? '...' : ''}"`);
+        console.log(`Detected languages: [${detectedLanguages.length > 0 ? detectedLanguages.join(', ') : 'none detected'}]`);
+        console.log(`Words array length: ${words.length}`);
         if (words.length > 0) {
-          console.log(`📊 First few words:`, words.slice(0, 3).map((w: any) => ({
+          console.log(`First few words:`, words.slice(0, 3).map((w: any) => ({
             word: w.word,
             language: w.language,
             confidence: w.confidence
@@ -1009,7 +1022,7 @@ const App: () => JSX.Element = () => {
 
       // Log code-switching detection for debugging
       if (detectedLanguages.length > 1) {
-        console.log(`🌐 Code-switching detected: [${detectedLanguages.join(', ')}] in: "${thisCaption.substring(0, 50)}..."`);
+        console.log(`Code-switching detected: [${detectedLanguages.join(', ')}] in: "${thisCaption.substring(0, 50)}..."`);
       }
       
       if (isFinal) {
@@ -1063,7 +1076,7 @@ const App: () => JSX.Element = () => {
     // Handler for when Deepgram detects the speaker has paused/stopped talking
     // Improved: Only process if we have substantial content, otherwise wait for more
     const onUtteranceEnd = () => {
-      console.log('🎤 Speaker pause detected...');
+      console.log('Speaker pause detected...');
 
       const bufferLength = currentSentenceBuffer.current.text.trim().length;
       
@@ -1074,7 +1087,7 @@ const App: () => JSX.Element = () => {
         const langInfo = currentSentenceBuffer.current.languages.length > 0 
           ? ` [${currentSentenceBuffer.current.languages.join(', ')}]` 
           : '';
-        console.log(`📝 Substantial buffer${langInfo} (${bufferLength} chars), processing...`);
+        console.log(`Substantial buffer${langInfo} (${bufferLength} chars), processing...`);
 
         // Clear any pending timeout since we're processing now
         if (bufferTimeout.current) {
@@ -1085,26 +1098,26 @@ const App: () => JSX.Element = () => {
         // Process the buffered text
         processBufferedText();
       } else if (bufferLength > 0) {
-        console.log(`⏳ Small buffer (${bufferLength} chars), waiting for more content...`);
+        console.log(`Small buffer (${bufferLength} chars), waiting for more content...`);
         // Don't flush yet - let the buffer continue accumulating
         // The regular timeout will flush if no more audio comes
       } else {
-        console.log('📭 Buffer empty, nothing to process');
+        console.log('Buffer empty, nothing to process');
       }
     };
 
     if (connectionState === LiveConnectionState.OPEN) {
-      console.log('🔗 Registering event listeners for transcript and audio data');
+      console.log('Registering event listeners for transcript and audio data');
       microphone.addEventListener(MicrophoneEvents.DataAvailable, onData);
 
       if (isMultiMode) {
         // Multi mode - register winner event handler
-        console.log('📡 Multi-mode: Registering winner event listener');
+        console.log('Multi-mode: Registering winner event listener');
         const cleanup = multiContext.onWinnerSelected(handleWinnerTranscript);
 
         // Only start microphone if it's not already recording
         if (microphone.state !== "recording") {
-          console.log('🎤 Starting microphone...');
+          console.log('Starting microphone...');
           startMicrophone();
         }
 
@@ -1114,7 +1127,7 @@ const App: () => JSX.Element = () => {
         };
       } else {
         // Single mode - register transcript events
-        console.log('📡 Single-mode: Registering transcript event listeners');
+        console.log('Single-mode: Registering transcript event listeners');
         const conn = singleContext.connection;
         if (conn) {
           conn.addListener(LiveTranscriptionEvents.Transcript, onTranscript);
@@ -1123,7 +1136,7 @@ const App: () => JSX.Element = () => {
 
         // Only start microphone if it's not already recording
         if (microphone.state !== "recording") {
-          console.log('🎤 Starting microphone...');
+          console.log('Starting microphone...');
           startMicrophone();
         }
 
@@ -1136,7 +1149,7 @@ const App: () => JSX.Element = () => {
         };
       }
     } else {
-      console.log('⚠️ Connection not open, state:', connectionState);
+      console.log('Connection not open, state:', connectionState);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1227,7 +1240,7 @@ const App: () => JSX.Element = () => {
    */
   const renderTranscriptBlock = (block: TranscriptBlock) => {
     // Debug: log when rendering blocks
-    console.log(`🎨 Rendering block: ${block.id}, text: "${block.original.text.substring(0, 30)}...", ragCorrected: ${!!block.ragCorrected}`);
+    console.log(`Rendering block: ${block.id}, text: "${block.original.text.substring(0, 30)}...", ragCorrected: ${!!block.ragCorrected}`);
     
     return (
       <div key={block.id} className="mb-6 border-l-2 border-[#0D9488] pl-4 hover:border-[#14B8A6] transition-colors duration-200">
@@ -1250,7 +1263,6 @@ const App: () => JSX.Element = () => {
                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.061l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.061 1.06l1.06 1.06z" />
                 </svg>
-                ✨
               </span>
               
               {/* Hover tooltip showing original text */}

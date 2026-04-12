@@ -1,3 +1,12 @@
+/**
+ * UsageIndicator — pill-shaped status badge showing remaining daily time.
+ *
+ * Renders differently per state:
+ *   - PRO tier: purple "Unlimited" badge
+ *   - Time expired: red "Time expired" badge
+ *   - < 5 minutes remaining: amber badge with time countdown
+ *   - Otherwise: green badge with time countdown
+ */
 "use client";
 
 import { useUsage } from "../context/UsageContextProvider";

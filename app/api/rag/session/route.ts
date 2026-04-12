@@ -137,10 +137,10 @@ export async function DELETE(request: NextRequest) {
     const statsBefore = await getSessionStats(sessionId);
 
     // Clear the session
-    console.log(`🗑️ Clearing session ${sessionId}...`);
+    console.log(`Clearing session ${sessionId}...`);
     const result = await clearSession(sessionId);
 
-    console.log(`✅ Cleared ${result.deleted} vectors from session ${sessionId}`);
+    console.log(`Cleared ${result.deleted} vectors from session ${sessionId}`);
 
     return NextResponse.json({
       success: true,

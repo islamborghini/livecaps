@@ -1,3 +1,14 @@
+/**
+ * GET  /api/cache?action=stats   — return detailed cache statistics
+ * GET  /api/cache?action=clear   — clear the server-side translation cache
+ * GET  /api/cache                — return basic cache statistics (default)
+ *
+ * POST /api/cache { action: 'preload', targetLanguage }
+ *   — fire-and-forget preload of common phrases into the translation cache
+ *     for the given language using Google Translate.
+ * POST /api/cache { action: 'clear' }
+ *   — clear the translation cache.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { serverTranslationCache, commonPhrases } from '../../lib/translationCache';
 

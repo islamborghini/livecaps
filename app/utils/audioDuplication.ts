@@ -47,7 +47,7 @@ export async function duplicateAudioBlob(
 
     return duplicates;
   } catch (error) {
-    console.error("❌ Failed to duplicate audio blob:", error);
+    console.error("Failed to duplicate audio blob:", error);
     throw new Error(`Audio duplication failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
@@ -66,7 +66,7 @@ export async function cloneAudioBlob(original: Blob): Promise<Blob> {
     const arrayBuffer = await original.arrayBuffer();
     return new Blob([arrayBuffer], { type: original.type });
   } catch (error) {
-    console.error("❌ Failed to clone audio blob:", error);
+    console.error("Failed to clone audio blob:", error);
     throw new Error(`Audio cloning failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }

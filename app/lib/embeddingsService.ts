@@ -167,7 +167,7 @@ export async function embedText(
   // Check cache first
   const cached = cache.get(cacheKey);
   if (cached) {
-    console.log(`📦 Cache hit for embedding: "${text.substring(0, 30)}..."`);
+    console.log(`Cache hit for embedding: "${text.substring(0, 30)}..."`);
     return {
       text,
       vector: cached,
@@ -217,7 +217,7 @@ export async function embedText(
       // Cache the result
       cache.set(cacheKey, vector);
 
-      console.log(`✅ Embedded text: "${text.substring(0, 30)}..." (${vector.length} dims)`);
+      console.log(`Embedded text: "${text.substring(0, 30)}..." (${vector.length} dims)`);
 
       return {
         text,
@@ -227,7 +227,7 @@ export async function embedText(
       };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      console.warn(`⚠️ Embedding attempt ${attempt + 1}/${cfg.maxRetries} failed:`, lastError.message);
+      console.warn(`Embedding attempt ${attempt + 1}/${cfg.maxRetries} failed:`, lastError.message);
 
       if (attempt < cfg.maxRetries - 1) {
         await sleep(cfg.retryDelayMs * (attempt + 1)); // Exponential backoff
@@ -237,7 +237,7 @@ export async function embedText(
 
   // All retries failed - use fallback if enabled
   if (cfg.useFallback) {
-    console.warn(`⚠️ Using fallback embedding for: "${text.substring(0, 30)}..."`);
+    console.warn(`Using fallback embedding for: "${text.substring(0, 30)}..."`);
     const fallbackVector = generateFallbackEmbedding(text);
 
     // Cache the fallback too
@@ -286,7 +286,7 @@ export async function embedBatch(
     }
   }
 
-  console.log(`📦 Batch embedding: ${texts.length} total, ${texts.length - uncachedTexts.length} cached, ${uncachedTexts.length} to embed`);
+  console.log(`Batch embedding: ${texts.length} total, ${texts.length - uncachedTexts.length} cached, ${uncachedTexts.length} to embed`);
 
   if (uncachedTexts.length === 0) {
     return results;
@@ -355,11 +355,11 @@ export async function embedBatch(
           };
         }
 
-        console.log(`✅ Batch ${Math.floor(batchStart / cfg.maxBatchSize) + 1}: embedded ${batch.length} texts`);
+        console.log(`Batch ${Math.floor(batchStart / cfg.maxBatchSize) + 1}: embedded ${batch.length} texts`);
         success = true;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.warn(`⚠️ Batch attempt ${attempt + 1}/${cfg.maxRetries} failed:`, lastError.message);
+        console.warn(`Batch attempt ${attempt + 1}/${cfg.maxRetries} failed:`, lastError.message);
 
         if (attempt < cfg.maxRetries - 1) {
           await sleep(cfg.retryDelayMs * (attempt + 1));
@@ -369,7 +369,7 @@ export async function embedBatch(
 
     // If batch failed, use fallback for remaining items in this batch
     if (!success && cfg.useFallback) {
-      console.warn(`⚠️ Using fallback embeddings for batch of ${batch.length} texts`);
+      console.warn(`Using fallback embeddings for batch of ${batch.length} texts`);
 
       for (const item of batch) {
         if (!results[item.index]) {
@@ -434,7 +434,7 @@ export function getCacheStats(): { size: number; maxSize: number } {
 export function clearCache(): void {
   if (embeddingCache) {
     embeddingCache.clear();
-    console.log("🗑️ Embedding cache cleared");
+    console.log("Embedding cache cleared");
   }
 }
 

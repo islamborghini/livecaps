@@ -67,7 +67,7 @@ const getApiKey = async (): Promise<string> => {
 
     return result.key;
   } catch (error) {
-    console.error("❌ Failed to get API key:", error);
+    console.error("Failed to get API key:", error);
     throw error;
   }
 };
@@ -151,7 +151,7 @@ export function MultiDeepgramContextProvider({
       const newState = aggregateConnectionStates(conns);
       setOverallState((prevState) => {
         if (newState !== prevState) {
-          console.log(`🔄 Overall state changed: ${prevState} → ${newState}`);
+          console.log(`Overall state changed: ${prevState} → ${newState}`);
           return newState;
         }
         return prevState;
@@ -167,7 +167,7 @@ export function MultiDeepgramContextProvider({
     async (language: string, apiKey: string): Promise<DeepgramConnection> => {
       const connectionId = `connection-${language}`;
 
-      console.log(`🔗 Creating connection for language: ${language}`);
+      console.log(`Creating connection for language: ${language}`);
 
       // Create Deepgram client
       const deepgram = createClient(apiKey);
@@ -184,7 +184,7 @@ export function MultiDeepgramContextProvider({
         vad_events: true,
       };
 
-      console.log(`📞 Establishing WebSocket for [${language}]:`, options);
+      console.log(`Establishing WebSocket for [${language}]:`, options);
 
       // Create live connection
       const client = deepgram.listen.live(options);
@@ -218,7 +218,7 @@ export function MultiDeepgramContextProvider({
 
     // Open event
     client.addListener(LiveTranscriptionEvents.Open, () => {
-      console.log(`✅ Connection opened: [${language}] (${id})`);
+      console.log(`Connection opened: [${language}] (${id})`);
 
       // Also update the connection object directly for immediate state access
       connection.state = LiveConnectionState.OPEN;
@@ -239,7 +239,7 @@ export function MultiDeepgramContextProvider({
 
     // Close event
     client.addListener(LiveTranscriptionEvents.Close, (event: any) => {
-      console.log(`❌ Connection closed: [${language}] (${id})`, event);
+      console.log(`Connection closed: [${language}] (${id})`, event);
 
       // Update connection object directly
       connection.state = LiveConnectionState.CLOSED;
@@ -256,7 +256,7 @@ export function MultiDeepgramContextProvider({
 
     // Error event
     client.addListener(LiveTranscriptionEvents.Error, (error: any) => {
-      console.error(`❌ Connection error: [${language}] (${id})`, error);
+      console.error(`Connection error: [${language}] (${id})`, error);
 
       // Update connection object directly
       connection.errorCount++;
@@ -273,7 +273,7 @@ export function MultiDeepgramContextProvider({
           // Circuit breaker: mark unhealthy after 3 errors
           if (conn.errorCount >= 3) {
             console.error(
-              `⚠️ Connection marked unhealthy after ${conn.errorCount} errors: [${language}]`
+              `Connection marked unhealthy after ${conn.errorCount} errors: [${language}]`
             );
             conn.isHealthy = false;
           }
@@ -292,7 +292,7 @@ export function MultiDeepgramContextProvider({
 
     // Utterance end event (optional, for buffer flushing)
     client.addListener(LiveTranscriptionEvents.UtteranceEnd, () => {
-      console.log(`🎤 Utterance end detected: [${language}]`);
+      console.log(`Utterance end detected: [${language}]`);
       // Could trigger immediate buffer flush here if needed
     });
 
@@ -312,7 +312,7 @@ export function MultiDeepgramContextProvider({
    */
   const handleWinnerSelected = useCallback((winner: WinnerTranscript) => {
     console.log(
-      `🏆 Winner selected: [${winner.language}] confidence=${winner.confidence.toFixed(3)}`
+      `Winner selected: [${winner.language}] confidence=${winner.confidence.toFixed(3)}`
     );
 
     // Notify all registered callbacks
@@ -360,7 +360,7 @@ export function MultiDeepgramContextProvider({
       };
 
       console.log(
-        `📡 Transcript from [${language}]: confidence=${confidence.toFixed(3)}, isFinal=${isFinal}, text="${transcript.substring(0, 40)}..."`
+        `Transcript from [${language}]: confidence=${confidence.toFixed(3)}, isFinal=${isFinal}, text="${transcript.substring(0, 40)}..."`
       );
 
       // Update connection's last transcript
@@ -380,7 +380,7 @@ export function MultiDeepgramContextProvider({
         // OPTIMIZATION: Early winner exit for high-confidence results
         // If confidence is very high, don't wait for other connections
         if (confidence >= CONFIDENCE_CONFIG.HIGH_CONFIDENCE_EARLY_EXIT) {
-          console.log(`⚡ High confidence (${confidence.toFixed(3)}) - early winner exit for [${language}]`);
+          console.log(`High confidence (${confidence.toFixed(3)}) - early winner exit for [${language}]`);
           
           // Create winner directly without waiting for buffer
           const earlyWinner: WinnerTranscript = {
@@ -412,7 +412,7 @@ export function MultiDeepgramContextProvider({
   const connectToDeepgram = useCallback(
     async (languages: string[]) => {
       console.log(
-        `🌐 Connecting to Deepgram with ${languages.length} parallel connections:`,
+        `Connecting to Deepgram with ${languages.length} parallel connections:`,
         languages
       );
 
@@ -458,9 +458,9 @@ export function MultiDeepgramContextProvider({
         // Update config
         setConfig((prev) => ({ ...prev, languages }));
 
-        console.log(`✅ All ${languages.length} connections established`);
+        console.log(`All ${languages.length} connections established`);
       } catch (error) {
-        console.error("❌ Failed to establish connections:", error);
+        console.error("Failed to establish connections:", error);
         setOverallState(LiveConnectionState.CLOSED);
         throw error;
       }
@@ -474,7 +474,7 @@ export function MultiDeepgramContextProvider({
    */
   const disconnectFromDeepgram = useCallback(() => {
     const currentConnections = connectionsRef.current;
-    console.log(`🔌 Disconnecting all connections (${currentConnections.size} active)`);
+    console.log(`Disconnecting all connections (${currentConnections.size} active)`);
 
     // Stop all keep-alive intervals
     keepAliveIntervals.current.forEach((interval) => {
@@ -488,17 +488,17 @@ export function MultiDeepgramContextProvider({
         // Only call finish() if the connection is actually open
         if (connection.state === LiveConnectionState.OPEN) {
           connection.client.finish();
-          console.log(`🔌 Closed connection: [${connection.language}]`);
+          console.log(`Closed connection: [${connection.language}]`);
         } else {
-          console.log(`⏭️ Skipping close for [${connection.language}] - state: ${connection.state}`);
+          console.log(`Skipping close for [${connection.language}] - state: ${connection.state}`);
         }
       } catch (error) {
         // Silently handle already closed connections
         if (error instanceof Error && error.message.includes('CLOSED')) {
-          console.log(`ℹ️ Connection [${connection.language}] already closed`);
+          console.log(`Connection [${connection.language}] already closed`);
         } else {
           console.error(
-            `⚠️ Error closing connection [${connection.language}]:`,
+            `Error closing connection [${connection.language}]:`,
             error
           );
         }
@@ -518,7 +518,7 @@ export function MultiDeepgramContextProvider({
       transcriptBuffer.current = null;
     }
 
-    console.log("✅ All connections disconnected");
+    console.log("All connections disconnected");
   }, []);
 
   /**
@@ -532,7 +532,7 @@ export function MultiDeepgramContextProvider({
       );
 
       if (healthyConnections.length === 0) {
-        console.warn("⚠️ No healthy connections to send audio to");
+        console.warn("No healthy connections to send audio to");
         return;
       }
 
@@ -549,13 +549,13 @@ export function MultiDeepgramContextProvider({
             conn.client.send(audioBlobs[index]);
           } catch (error) {
             console.error(
-              `⚠️ Failed to send audio to [${conn.language}]:`,
+              `Failed to send audio to [${conn.language}]:`,
               error
             );
           }
         });
       } catch (error) {
-        console.error("❌ Failed to duplicate/send audio:", error);
+        console.error("Failed to duplicate/send audio:", error);
       }
     },
     [connections]
@@ -601,7 +601,7 @@ export function MultiDeepgramContextProvider({
     return () => {
       // Use a local function to avoid closure issues
       const cleanup = () => {
-        console.log('🧹 Unmount cleanup: disconnecting all connections');
+        console.log('Unmount cleanup: disconnecting all connections');
         
         // Stop all keep-alive intervals
         keepAliveIntervals.current.forEach((interval) => {

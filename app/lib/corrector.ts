@@ -83,9 +83,9 @@ function log(message: string, data?: unknown, isDebug = false): void {
   if (isDebug && process.env.NODE_ENV !== "development") return;
   
   if (data) {
-    console.log(`[${timestamp}] 🔧 Corrector: ${message}`, data);
+    console.log(`[${timestamp}] Corrector: ${message}`, data);
   } else {
-    console.log(`[${timestamp}] 🔧 Corrector: ${message}`);
+    console.log(`[${timestamp}] Corrector: ${message}`);
   }
 }
 

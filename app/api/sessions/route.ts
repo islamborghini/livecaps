@@ -1,3 +1,10 @@
+/**
+ * GET  /api/sessions — list the current user's 50 most recent sessions,
+ *   ordered by creation date descending.
+ *
+ * POST /api/sessions — create a new session record when the microphone starts.
+ *   Stores the spoken and display language arrays chosen at session start.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { getCurrentUser } from "@/app/lib/auth";

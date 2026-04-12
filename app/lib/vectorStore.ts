@@ -153,7 +153,7 @@ export async function indexSessionContent(
   let failed = 0;
   const totalBatches = Math.ceil(terms.length / cfg.indexBatchSize);
 
-  console.log(`📥 Indexing ${terms.length} terms for session ${sessionId}...`);
+  console.log(`Indexing ${terms.length} terms for session ${sessionId}...`);
 
   // Process in batches
   for (let i = 0; i < terms.length; i += cfg.indexBatchSize) {
@@ -199,16 +199,16 @@ export async function indexSessionContent(
       if (vectors.length > 0) {
         await index.upsert(vectors);
         indexed += vectors.length;
-        console.log(`  ✅ Indexed batch ${batchNum}: ${vectors.length} terms`);
+        console.log(`  Indexed batch ${batchNum}: ${vectors.length} terms`);
       }
     } catch (error) {
-      console.error(`  ❌ Failed to index batch ${batchNum}:`, error);
+      console.error(`  Failed to index batch ${batchNum}:`, error);
       failed += batch.length;
     }
   }
 
   const duration = Date.now() - startTime;
-  console.log(`📊 Indexing complete: ${indexed} indexed, ${failed} failed, ${duration}ms`);
+  console.log(`Indexing complete: ${indexed} indexed, ${failed} failed, ${duration}ms`);
 
   // Report completion
   onProgress?.({
@@ -234,7 +234,7 @@ export async function searchSessionTerms(
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const index = getVectorIndex(cfg);
 
-  console.log(`🔍 Searching for "${query}" in session ${sessionId}...`);
+  console.log(`Searching for "${query}" in session ${sessionId}...`);
 
   try {
     // Generate embedding for the query
@@ -311,7 +311,7 @@ export async function searchByPhonetics(
 ): Promise<VectorSearchResult[]> {
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
 
-  console.log(`🔊 Phonetic search for "${query}" in session ${sessionId}...`);
+  console.log(`Phonetic search for "${query}" in session ${sessionId}...`);
 
   // Filter terms for this session (if they have sessionId in metadata)
   // For now, use all provided terms
@@ -346,7 +346,7 @@ export async function hybridSearch(
 ): Promise<VectorSearchResult[]> {
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
 
-  console.log(`🔎 Hybrid search for "${query}" in session ${sessionId}...`);
+  console.log(`Hybrid search for "${query}" in session ${sessionId}...`);
 
   // Run both searches in parallel
   const [semanticResults, phoneticMatches] = await Promise.all([
@@ -423,7 +423,7 @@ export async function clearSession(
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const index = getVectorIndex(cfg);
 
-  console.log(`🗑️ Clearing session ${sessionId}...`);
+  console.log(`Clearing session ${sessionId}...`);
 
   // Drop the in-process cache entry regardless of vector-store outcome.
   clearCachedSession(sessionId);
@@ -499,7 +499,7 @@ export async function getSessionStats(
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const index = getVectorIndex(cfg);
 
-  console.log(`📊 Getting stats for session ${sessionId}...`);
+  console.log(`Getting stats for session ${sessionId}...`);
 
   try {
     // Use a random unit vector for the query (better than zero vector)
@@ -604,7 +604,7 @@ export async function getSessionTerms(
   const cached = getCachedSessionTerms(sessionId);
   if (cached && cached.length > 0) {
     console.log(
-      `📚 Using cached session terms for ${sessionId}: ${cached.length} terms`
+      `Using cached session terms for ${sessionId}: ${cached.length} terms`
     );
     return cached;
   }
@@ -612,7 +612,7 @@ export async function getSessionTerms(
   const cfg = { ...DEFAULT_VECTOR_STORE_CONFIG, ...config };
   const index = getVectorIndex(cfg);
 
-  console.log(`📚 Fetching all terms for session ${sessionId}...`);
+  console.log(`Fetching all terms for session ${sessionId}...`);
 
   try {
     // Use a random unit vector for the query

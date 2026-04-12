@@ -237,7 +237,7 @@ export async function correctWithLLM(
 
   // If LLM is disabled, use rule-based only
   if (!cfg.useLLM || !cfg.apiKey) {
-    console.log("📝 Using rule-based correction (LLM disabled or no API key)");
+    console.log("Using rule-based correction (LLM disabled or no API key)");
     return applyRuleBasedCorrections(transcript, lowConfidenceWords, candidateTerms, cfg);
   }
 
@@ -246,7 +246,7 @@ export async function correctWithLLM(
 
     const prompt = buildCorrectionPrompt(transcript, lowConfidenceWords, candidateTerms);
 
-    console.log("🤖 Calling LLM for correction...");
+    console.log("Calling LLM for correction...");
 
     const completion = await client.chat.completions.create({
       model: cfg.model,
@@ -266,7 +266,7 @@ export async function correctWithLLM(
 
     const responseText = completion.choices[0]?.message?.content || "";
 
-    console.log(`✅ LLM response received (${Date.now() - startTime}ms)`);
+    console.log(`LLM response received (${Date.now() - startTime}ms)`);
 
     const parsed = parseLLMResponse(responseText, transcript);
 
@@ -289,7 +289,7 @@ export async function correctWithLLM(
       usedLLM: true,
     };
   } catch (error) {
-    console.warn("⚠️ LLM correction failed, falling back to rule-based:", error);
+    console.warn("LLM correction failed, falling back to rule-based:", error);
     return applyRuleBasedCorrections(transcript, lowConfidenceWords, candidateTerms, cfg);
   }
 }
@@ -312,7 +312,7 @@ export function applyRuleBasedCorrections(
   const corrections: CorrectionDetail[] = [];
   let correctedTranscript = transcript;
 
-  console.log("📝 Applying rule-based corrections...");
+  console.log("Applying rule-based corrections...");
 
   // Build a map of potential replacements from candidate terms
   const termMap = new Map<string, VectorSearchResult>();
@@ -366,7 +366,7 @@ export function applyRuleBasedCorrections(
           position: lcWord.position,
         });
 
-        console.log(`  ✓ "${original}" → "${corrected}" (${(bestScore * 100).toFixed(0)}%)`);
+        console.log(`  "${original}" → "${corrected}" (${(bestScore * 100).toFixed(0)}%)`);
       }
     }
   }
@@ -417,7 +417,7 @@ export function applyRuleBasedCorrections(
               position: i,
             });
 
-            console.log(`  ✓ "${originalPhrase}" → "${term}" (phrase match)`);
+            console.log(`  "${originalPhrase}" → "${term}" (phrase match)`);
           }
         }
       }
@@ -449,7 +449,7 @@ export async function processCorrection(
   const startTime = Date.now();
   const cfg = { ...DEFAULT_LLM_CONFIG, ...config };
 
-  console.log(`\n🔧 Processing correction for: "${request.transcript.substring(0, 50)}..."`);
+  console.log(`\nProcessing correction for: "${request.transcript.substring(0, 50)}..."`);
 
   // Prefer explicit focus list (from upstream phonetic sweep); fall back to
   // confidence-only filtering when the caller didn't provide one.

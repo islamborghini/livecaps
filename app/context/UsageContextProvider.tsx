@@ -1,3 +1,16 @@
+/**
+ * UsageContextProvider — tracks daily transcription time for the current user.
+ *
+ * Maintains a client-side 1-second interval (startTimer/stopTimer) that
+ * increments local state optimistically. Every 30 seconds, and immediately on
+ * stopTimer, it syncs the accumulated seconds to POST /api/usage/sync.
+ * On tab close, navigator.sendBeacon ensures the final seconds are flushed.
+ *
+ * PRO users have secondsRemaining === null (unlimited). For FREE/PAID, the
+ * timer auto-stops when secondsRemaining reaches 0 and isTimeExpired flips true.
+ *
+ * Consume via the `useUsage()` hook.
+ */
 "use client";
 
 import {

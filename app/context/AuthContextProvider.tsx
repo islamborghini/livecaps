@@ -1,3 +1,14 @@
+/**
+ * AuthContextProvider — global authentication state for LiveCaps.
+ *
+ * On mount, attempts to restore an existing session by hitting GET /api/auth/me.
+ * Exposes `login`, `signup`, and `logout` actions that call the corresponding
+ * API routes and update the in-memory user state. Navigation after auth actions
+ * is handled here (login/signup redirect to /app, logout to /login).
+ *
+ * Consume via the `useAuth()` hook. Must be placed above any component that
+ * needs auth state.
+ */
 "use client";
 
 import {

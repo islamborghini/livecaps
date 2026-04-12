@@ -46,7 +46,7 @@ export function setCachedSessionTerms(
     createdAt: Date.now(),
   });
   console.log(
-    `💾 sessionTermCache: stored ${terms.length} terms for ${sessionId}`
+    `sessionTermCache: stored ${terms.length} terms for ${sessionId}`
   );
 }
 
