@@ -456,6 +456,21 @@ export async function correctTranscript(
       position: w.position,
     }));
 
+    // Build the set of "already correct" terms from the full session vocabulary
+    // (not just retrieved candidates). Words already matching one of these are
+    // never rewritten, and every proposed correction is validated against it.
+    // This is what prevents a correctly-transcribed indexed word like
+    // "jailbreak" from being mangled into "java break".
+    const protectedTermSet = new Set<string>();
+    for (const term of sessionTerms) {
+      const norm = (term.normalizedTerm || term.term).toLowerCase().trim();
+      if (!norm) continue;
+      protectedTermSet.add(norm);
+      for (const w of norm.split(/\s+/)) {
+        if (w.length >= 3) protectedTermSet.add(w);
+      }
+    }
+
     const correctionResult = await processCorrection(
       request,
       candidateTerms,
@@ -464,7 +479,8 @@ export async function correctTranscript(
         apiKey: process.env.GROQ_API_KEY,
         ruleBasedThreshold: cfg.similarityThreshold,
       },
-      focusWords
+      focusWords,
+      protectedTermSet
     );
 
     // Step 8: Build response

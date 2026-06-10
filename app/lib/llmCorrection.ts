@@ -40,6 +40,12 @@ export interface LLMCorrectionConfig {
   ruleBasedThreshold: number;
   /** Whether to use LLM or just rule-based */
   useLLM: boolean;
+  /**
+   * Minimum phonetic similarity (0-1) between the original word and the
+   * proposed replacement for a correction to be accepted. Guards against the
+   * LLM substituting words that don't actually sound like any indexed term.
+   */
+  minCorrectionSimilarity: number;
 }
 
 /**
@@ -53,7 +59,15 @@ export const DEFAULT_LLM_CONFIG: LLMCorrectionConfig = {
   timeoutMs: 5000,
   ruleBasedThreshold: 0.7, // Lowered from 0.85 for better phonetic matching
   useLLM: true,
+  minCorrectionSimilarity: 0.6, // Reject substitutions that don't sound alike
 };
+
+/**
+ * Margin by which a *different* candidate term must out-score the LLM's chosen
+ * replacement (phonetically) before we veto the correction. Prevents picking
+ * the wrong one of two similar indexed terms (e.g. "java" vs "jailbreak").
+ */
+const BETTER_CANDIDATE_MARGIN = 0.1;
 
 /**
  * Cached Groq client instance
@@ -211,13 +225,123 @@ function parseLLMResponse(
 }
 
 /**
+ * Escape a string for safe use inside a RegExp.
+ */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Normalize a token/phrase for term comparison: lowercase, strip punctuation
+ * (keeping intra-word apostrophes/hyphens), collapse whitespace.
+ */
+function cleanForCompare(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Validate a single proposed correction before it is applied.
+ *
+ * The LLM returns a full rewritten transcript and will sometimes substitute
+ * words that aren't similar to any indexed term, rewrite words that were
+ * already correct, or pick the wrong one of two similar terms. Every proposed
+ * correction must clear all of these gates or it is discarded.
+ *
+ * @param protectedTerms - Normalized set of indexed terms (and their tokens).
+ *   A word that already exactly matches one of these is considered correct and
+ *   must never be rewritten.
+ */
+function validateCorrection(
+  original: string,
+  corrected: string,
+  candidateTerms: VectorSearchResult[],
+  protectedTerms: Set<string>,
+  minSimilarity: number
+): { valid: boolean; reason: string } {
+  const origNorm = cleanForCompare(original);
+  const corrNorm = cleanForCompare(corrected);
+
+  if (!origNorm || !corrNorm) return { valid: false, reason: "empty original/corrected" };
+  if (origNorm === corrNorm) return { valid: false, reason: "no change" };
+
+  // (a) The replacement must be a real indexed/candidate term — never let the
+  //     LLM invent a substitution that isn't in the speaker's vocabulary.
+  const knownTargets = new Set(candidateTerms.map(c => cleanForCompare(c.term.term)));
+  if (!knownTargets.has(corrNorm) && !protectedTerms.has(corrNorm)) {
+    return { valid: false, reason: `target "${corrected}" is not an indexed term` };
+  }
+
+  // (b) Never rewrite a word that is ALREADY a valid indexed term. This is the
+  //     "jailbreak → java break" case: jailbreak was indexed and correct.
+  if (protectedTerms.has(origNorm)) {
+    return { valid: false, reason: `"${original}" is already a valid term` };
+  }
+
+  // (c) Phonetic floor — the original and replacement must actually sound alike.
+  //     Kills nonsense substitutions between unrelated words.
+  const chosenSim = calculatePhoneticSimilarity(origNorm, corrNorm).similarity;
+  if (chosenSim < minSimilarity) {
+    return {
+      valid: false,
+      reason: `phonetic similarity ${chosenSim.toFixed(2)} < ${minSimilarity}`,
+    };
+  }
+
+  // (d) The chosen term must be (near) the best-sounding candidate. If a
+  //     different candidate sounds clearly closer, the LLM picked wrong —
+  //     reject rather than apply a confidently-wrong correction.
+  for (const c of candidateTerms) {
+    const t = cleanForCompare(c.term.term);
+    if (t === corrNorm) continue;
+    const otherSim = calculatePhoneticSimilarity(origNorm, t).similarity;
+    if (otherSim > chosenSim + BETTER_CANDIDATE_MARGIN) {
+      return {
+        valid: false,
+        reason: `"${c.term.term}" (${otherSim.toFixed(2)}) sounds closer than "${corrected}" (${chosenSim.toFixed(2)})`,
+      };
+    }
+  }
+
+  return { valid: true, reason: "ok" };
+}
+
+/**
+ * Build the corrected transcript by applying ONLY validated corrections to the
+ * original text. We deliberately do not trust the LLM's rewritten transcript,
+ * since it may bundle in unvalidated changes.
+ */
+function applyValidatedCorrections(
+  transcript: string,
+  corrections: CorrectionDetail[]
+): string {
+  let out = transcript;
+  for (const c of corrections) {
+    const escaped = escapeRegExp(c.original);
+    // Prefer word-boundary replacement; fall back to a loose replace for
+    // multi-word originals or those carrying punctuation.
+    const boundary = new RegExp(`\\b${escaped}\\b`, "gi");
+    if (boundary.test(out)) {
+      out = out.replace(new RegExp(`\\b${escaped}\\b`, "gi"), c.corrected);
+    } else {
+      out = out.replace(new RegExp(escaped, "gi"), c.corrected);
+    }
+  }
+  return out;
+}
+
+/**
  * Apply LLM-based correction to a transcript
  */
 export async function correctWithLLM(
   transcript: string,
   lowConfidenceWords: Array<{ word: string; confidence: number; position: number }>,
   candidateTerms: VectorSearchResult[],
-  config: Partial<LLMCorrectionConfig> = {}
+  config: Partial<LLMCorrectionConfig> = {},
+  protectedTerms: Set<string> = new Set()
 ): Promise<{
   correctedTranscript: string;
   corrections: CorrectionDetail[];
@@ -238,7 +362,7 @@ export async function correctWithLLM(
   // If LLM is disabled, use rule-based only
   if (!cfg.useLLM || !cfg.apiKey) {
     console.log("Using rule-based correction (LLM disabled or no API key)");
-    return applyRuleBasedCorrections(transcript, lowConfidenceWords, candidateTerms, cfg);
+    return applyRuleBasedCorrections(transcript, lowConfidenceWords, candidateTerms, cfg, protectedTerms);
   }
 
   try {
@@ -270,27 +394,51 @@ export async function correctWithLLM(
 
     const parsed = parseLLMResponse(responseText, transcript);
 
-    // Convert to CorrectionDetail format
-    const corrections: CorrectionDetail[] = parsed.corrections.map((c, i) => ({
-      original: c.original,
-      corrected: c.corrected,
-      reason: c.reason,
-      confidence: 0.8, // LLM corrections get moderate confidence
-      matchedTerm: candidateTerms.find(t =>
-        t.term.term.toLowerCase() === c.corrected.toLowerCase()
-      )?.term.term,
-      matchType: "llm" as const,
-      position: i,
-    }));
+    // Validate each proposed correction. The LLM's rewritten transcript is
+    // NOT trusted: it routinely substitutes words that aren't similar to any
+    // indexed term, or picks the wrong one of two similar terms. We keep only
+    // corrections that pass phonetic + indexed-term validation, then rebuild
+    // the transcript ourselves from those.
+    const corrections: CorrectionDetail[] = [];
+    for (let i = 0; i < parsed.corrections.length; i++) {
+      const c = parsed.corrections[i];
+      const check = validateCorrection(
+        c.original,
+        c.corrected,
+        candidateTerms,
+        protectedTerms,
+        cfg.minCorrectionSimilarity
+      );
+
+      if (!check.valid) {
+        console.log(`  Rejected LLM correction "${c.original}" → "${c.corrected}": ${check.reason}`);
+        continue;
+      }
+
+      corrections.push({
+        original: c.original,
+        corrected: c.corrected,
+        reason: c.reason,
+        confidence: 0.8, // LLM corrections get moderate confidence
+        matchedTerm: candidateTerms.find(t =>
+          t.term.term.toLowerCase() === c.corrected.toLowerCase()
+        )?.term.term,
+        matchType: "llm" as const,
+        position: i,
+      });
+    }
+
+    // Rebuild from validated corrections only — never apply the raw LLM rewrite.
+    const correctedTranscript = applyValidatedCorrections(transcript, corrections);
 
     return {
-      correctedTranscript: parsed.correctedTranscript,
+      correctedTranscript,
       corrections,
       usedLLM: true,
     };
   } catch (error) {
     console.warn("LLM correction failed, falling back to rule-based:", error);
-    return applyRuleBasedCorrections(transcript, lowConfidenceWords, candidateTerms, cfg);
+    return applyRuleBasedCorrections(transcript, lowConfidenceWords, candidateTerms, cfg, protectedTerms);
   }
 }
 
@@ -302,7 +450,8 @@ export function applyRuleBasedCorrections(
   transcript: string,
   lowConfidenceWords: Array<{ word: string; confidence: number; position: number }>,
   candidateTerms: VectorSearchResult[],
-  config: Partial<LLMCorrectionConfig> = {}
+  config: Partial<LLMCorrectionConfig> = {},
+  protectedTerms: Set<string> = new Set()
 ): {
   correctedTranscript: string;
   corrections: CorrectionDetail[];
@@ -323,6 +472,11 @@ export function applyRuleBasedCorrections(
   // Process each low-confidence word
   for (const lcWord of lowConfidenceWords) {
     const word = lcWord.word.toLowerCase();
+
+    // Skip words that are already a valid indexed term — they're correct.
+    if (protectedTerms.has(cleanForCompare(word))) {
+      continue;
+    }
 
     // Find the best matching term
     let bestMatch: VectorSearchResult | null = null;
@@ -388,6 +542,11 @@ export function applyRuleBasedCorrections(
       for (let len = 2; len <= Math.min(3, words.length - i); len++) {
         const phrase = words.slice(i, i + len).join(" ");
 
+        // Skip phrases that already exactly match an indexed term.
+        if (protectedTerms.has(cleanForCompare(phrase))) {
+          continue;
+        }
+
         const phoneticResult = calculatePhoneticSimilarity(phrase, term);
 
         if (phoneticResult.similarity >= cfg.ruleBasedThreshold) {
@@ -439,12 +598,16 @@ export function applyRuleBasedCorrections(
  *   When provided, overrides the default confidence-based filter. This lets
  *   upstream (corrector.ts) flag high-confidence phonetic near-misses like
  *   "Grock" ↔ "Groq" that the confidence gate would otherwise miss.
+ * @param protectedTerms - Normalized set of indexed terms (and their tokens).
+ *   Words already matching one of these are treated as correct and never
+ *   rewritten; proposed corrections are validated against this set.
  */
 export async function processCorrection(
   request: CorrectionRequest,
   candidateTerms: VectorSearchResult[],
   config: Partial<LLMCorrectionConfig> = {},
-  focusWords?: Array<{ word: string; confidence: number; position: number }>
+  focusWords?: Array<{ word: string; confidence: number; position: number }>,
+  protectedTerms: Set<string> = new Set()
 ): Promise<CorrectionResponse> {
   const startTime = Date.now();
   const cfg = { ...DEFAULT_LLM_CONFIG, ...config };
@@ -484,7 +647,8 @@ export async function processCorrection(
     request.transcript,
     wordsToCorrect,
     candidateTerms,
-    cfg
+    cfg,
+    protectedTerms
   );
 
   const response: CorrectionResponse = {
